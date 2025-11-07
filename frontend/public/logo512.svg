@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="64" fill="#3b82f6"/>
+  <rect x="64" y="64" width="384" height="384" rx="32" fill="white"/>
+  
+  <!-- Main cargo container -->
+  <rect x="128" y="128" width="256" height="128" rx="12" fill="#3b82f6"/>
+  <rect x="140" y="140" width="232" height="104" rx="8" fill="white"/>
+  
+  <!-- Container sections -->
+  <rect x="160" y="160" width="64" height="24" rx="4" fill="#3b82f6"/>
+  <rect x="160" y="192" width="48" height="12" rx="2" fill="#94a3b8"/>
+  <rect x="160" y="212" width="56" height="12" rx="2" fill="#94a3b8"/>
+  
+  <rect x="264" y="160" width="64" height="24" rx="4" fill="#3b82f6"/>
+  <rect x="264" y="192" width="48" height="12" rx="2" fill="#94a3b8"/>
+  <rect x="264" y="212" width="56" height="12" rx="2" fill="#94a3b8"/>
+  
+  <!-- Connection path -->
+  <path d="M128 320 Q256 288 384 320" stroke="#3b82f6" stroke-width="8" fill="none"/>
+  <circle cx="128" cy="320" r="16" fill="#ef4444"/>
+  <circle cx="384" cy="320" r="16" fill="#22c55e"/>
+  
+  <!-- Africa and Asia labels -->
+  <text x="128" y="360" text-anchor="middle" fill="#ef4444" font-family="Arial, sans-serif" font-size="20" font-weight="bold">AFRICA</text>
+  <text x="384" y="360" text-anchor="middle" fill="#22c55e" font-family="Arial, sans-serif" font-size="20" font-weight="bold">ASIA</text>
+  
+  <!-- Company name -->
+  <text x="256" y="400" text-anchor="middle" fill="#3b82f6" font-family="Arial, sans-serif" font-size="32" font-weight="bold">TUMA</text>
+  <text x="256" y="430" text-anchor="middle" fill="#64748b" font-family="Arial, sans-serif" font-size="24">AFRICA LINK CARGO</text>
+</svg>

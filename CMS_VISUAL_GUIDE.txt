@@ -1,0 +1,86 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    🎨 SUPERADMIN CMS - VISUAL GUIDE                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📍 URL: http://localhost:3000/admin/cms
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                              SIDEBAR NAVIGATION                               │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  🖼️  Hero Section          │  Main banner customization                     │
+│  📢  Advertisements         │  Promotional banners                           │
+│  🛍️  Products Section       │  Homepage product display                      │
+│  🎨  Theme & Colors         │  ← COLORS & THEME HERE                        │
+│  🏢  Company Info           │  Business details                              │
+│  🌐  Social Links           │  Social media profiles                         │
+│  ⚙️  Features               │  ← TOGGLE FEATURES HERE                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         THEME & COLORS SECTION                               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Color Palette:
+  Primary Color:    [Color Picker]  #3b82f6
+  Secondary Color:  [Color Picker]  #64748b
+  Accent Color:     [Color Picker]  #f59e0b
+  Background Color: [Color Picker]  #ffffff
+
+Typography:
+  Font Family: [Dropdown] Inter, Roboto, Poppins, Montserrat
+
+Border Radius:
+  Corner Roundness: [Dropdown] None, Small, Medium, Large
+
+Quick Presets:
+  [Default Blue]  [Fresh Green]  [Purple Pink]  [Dark Mode]
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                           FEATURES SECTION                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Feature Toggles:
+  Live Chat Support        [Toggle ON/OFF]
+  Product Reviews          [Toggle ON/OFF]
+  Wishlist                 [Toggle ON/OFF]
+  Push Notifications       [Toggle ON/OFF]
+  Maintenance Mode         [Toggle ON/OFF] (Warning: Red)
+  User Registration        [Toggle ON/OFF]
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          HOW TO USE                                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+1. LOGIN
+   → Go to: http://localhost:3000/login
+   → Email: admin@tumaafricacargo.com
+   → Password: admin123
+
+2. NAVIGATE TO CMS
+   → Click "CMS Settings" in admin menu
+   → Or go to: http://localhost:3000/admin/cms
+
+3. CHANGE COLORS
+   → Click "Theme & Colors" in sidebar
+   → Click color picker for any color
+   → Choose your color or click a Quick Preset
+   → Click "Save Changes"
+
+4. TOGGLE FEATURES
+   → Click "Features" in sidebar
+   → Toggle switches on/off (Green = Enabled, Gray = Disabled)
+   → Click "Save Changes"
+
+5. SAVE
+   → Always click "Save Changes" button
+   → Wait for success message
+   → Changes apply immediately
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                      YOU'RE READY TO GO! 🚀                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+✅ All features are already implemented and working!
+✅ No coding required - just point and click!
+
+Access the CMS now: http://localhost:3000/admin/cms
