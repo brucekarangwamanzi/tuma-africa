@@ -7,7 +7,6 @@ import { useSettingsStore } from './store/settingsStore';
 
 // Layout Components
 import Navbar from './components/layout/Navbar';
-import Footer from './components/layout/Footer';
 
 
 
@@ -199,8 +198,6 @@ function App() {
           } />
         </Routes>
       </main>
-      
-      <Footer />
       
       <ToastContainer
         position="top-right"
