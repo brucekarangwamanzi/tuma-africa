@@ -33,6 +33,12 @@ interface Chat {
   title: string;
   status: string;
   priority: string;
+  orderId?: {
+    _id: string;
+    orderId: string;
+    productName: string;
+    status: string;
+  };
   messages: Array<{
     _id: string;
     sender: string;
@@ -72,12 +78,22 @@ const ChatManagementPage: React.FC = () => {
         
         // Listen for new messages
         websocketService.onNewMessage((data) => {
+          console.log('Admin received message:', data);
+          
           // Refresh chats when new message arrives
           fetchChats();
           
-          // Show notification if not viewing this chat
+          // Show notification with user info if not viewing this chat
           if (!selectedChat || selectedChat._id !== data.chatId) {
-            toast.info('New message received');
+            const senderName = data.message.senderName || 'User';
+            toast.info(`💬 New message from ${senderName}`, {
+              autoClose: 5000,
+              onClick: () => {
+                // Find and select the chat
+                const chat = chats.find(c => c._id === data.chatId);
+                if (chat) setSelectedChat(chat);
+              }
+            });
           }
         });
       }
@@ -370,27 +386,46 @@ const ChatManagementPage: React.FC = () => {
                     <p>No chats found</p>
                   </div>
                 ) : (
-                  filteredChats.map((chat) => (
-                    <div
-                      key={chat._id}
-                      onClick={() => setSelectedChat(chat)}
-                      className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                        selectedChat?._id === chat._id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium text-gray-900 truncate">{chat.title}</h4>
-                        {getStatusBadge(chat.status)}
+                  filteredChats.map((chat) => {
+                    const user = chat.participants.find(p => p.role === 'user');
+                    return (
+                      <div
+                        key={chat._id}
+                        onClick={() => setSelectedChat(chat)}
+                        className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 ${
+                          selectedChat?._id === chat._id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <h4 className="font-medium text-gray-900">
+                                {user?.fullName || 'Unknown User'}
+                              </h4>
+                              {getStatusBadge(chat.status)}
+                            </div>
+                            {chat.orderId && (
+                              <div className="flex items-center space-x-1 text-xs">
+                                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded font-medium">
+                                  📦 {chat.orderId.orderId}
+                                </span>
+                                <span className="text-gray-600 truncate">
+                                  {chat.orderId.productName}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2">
+                          {user?.email}
+                        </p>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>{chat.messages.length} messages</span>
+                          <span>{formatDistanceToNow(new Date(chat.updatedAt), { addSuffix: true })}</span>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 mb-2">
-                        {chat.participants.find(p => p.role === 'user')?.fullName || 'Unknown User'}
-                      </p>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{chat.messages.length} messages</span>
-                        <span>{formatDistanceToNow(new Date(chat.updatedAt), { addSuffix: true })}</span>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -401,33 +436,84 @@ const ChatManagementPage: React.FC = () => {
             {selectedChat ? (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 {/* Chat Header */}
-                <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-lg">{selectedChat.title}</h3>
-                      <p className="text-sm opacity-90">
-                        {selectedChat.participants.find(p => p.role === 'user')?.email}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleExportChat(selectedChat._id)}
-                        className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
-                        title="Export chat"
-                      >
-                        <Download className="w-5 h-5" />
-                      </button>
-                      <select
-                        value={selectedChat.status}
-                        onChange={(e) => handleUpdateStatus(selectedChat._id, e.target.value)}
-                        className="px-3 py-1 rounded-lg text-sm bg-white text-gray-900 border-none focus:ring-2 focus:ring-white"
-                      >
-                        <option value="open">Open</option>
-                        <option value="pending">Pending</option>
-                        <option value="closed">Closed</option>
-                      </select>
+                <div className="border-b border-gray-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white">
+                  <div className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                            <span className="text-xl font-bold">
+                              {selectedChat.participants.find(p => p.role === 'user')?.fullName?.charAt(0) || 'U'}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <h3 className="font-semibold text-lg">
+                                {selectedChat.participants.find(p => p.role === 'user')?.fullName || 'Unknown User'}
+                              </h3>
+                              <span className="px-2 py-0.5 bg-white bg-opacity-20 rounded text-xs">
+                                Customer
+                              </span>
+                            </div>
+                            <p className="text-sm opacity-90">
+                              {selectedChat.participants.find(p => p.role === 'user')?.email}
+                            </p>
+                            {selectedChat.orderId && (
+                              <div className="mt-2 flex items-center space-x-2 text-sm">
+                                <span className="px-2 py-1 bg-yellow-400 bg-opacity-90 text-gray-900 rounded font-medium">
+                                  📦 Order: {selectedChat.orderId.orderId}
+                                </span>
+                                <span className="px-2 py-1 bg-white bg-opacity-20 rounded">
+                                  {selectedChat.orderId.productName}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleExportChat(selectedChat._id)}
+                          className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-colors"
+                          title="Export chat"
+                        >
+                          <Download className="w-5 h-5" />
+                        </button>
+                        <select
+                          value={selectedChat.status}
+                          onChange={(e) => handleUpdateStatus(selectedChat._id, e.target.value)}
+                          className="px-3 py-1 rounded-lg text-sm bg-white text-gray-900 border-none focus:ring-2 focus:ring-white"
+                        >
+                          <option value="open">Open</option>
+                          <option value="pending">Pending</option>
+                          <option value="closed">Closed</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
+                  
+                  {/* Order/Product Information */}
+                  {selectedChat.orderId && (
+                    <div className="px-4 pb-4">
+                      <div className="bg-white bg-opacity-10 rounded-lg p-3">
+                        <div className="flex items-center space-x-2 text-sm">
+                          <MessageCircle className="w-4 h-4" />
+                          <span className="font-medium">Regarding:</span>
+                          <span className="opacity-90">
+                            Order #{selectedChat.orderId.orderId} - {selectedChat.orderId.productName}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${
+                            selectedChat.orderId.status === 'delivered' ? 'bg-green-500' :
+                            selectedChat.orderId.status === 'shipped' ? 'bg-blue-500' :
+                            selectedChat.orderId.status === 'pending' ? 'bg-yellow-500' :
+                            'bg-gray-500'
+                          }`}>
+                            {selectedChat.orderId.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Messages */}
