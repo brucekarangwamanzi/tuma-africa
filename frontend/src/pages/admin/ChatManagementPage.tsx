@@ -434,23 +434,32 @@ const ChatManagementPage: React.FC = () => {
                 <div className="p-4 h-96 overflow-y-auto space-y-4">
                   {selectedChat.messages.map((message) => {
                     const isAdmin = message.sender !== selectedChat.participants.find(p => p.role === 'user')?._id;
+                    const sender = selectedChat.participants.find(p => p._id === message.sender);
+                    const senderName = sender?.fullName || 'Unknown';
                     
                     return (
                       <div
                         key={message._id}
                         className={`flex ${isAdmin ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div
-                          className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
-                            isAdmin
-                              ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-br-md'
-                              : 'bg-gray-100 text-gray-900 rounded-bl-md'
-                          }`}
-                        >
-                          <p className="text-sm leading-relaxed">{message.text}</p>
-                          <div className="flex items-center justify-between mt-2 text-xs opacity-75">
-                            <span>{formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}</span>
-                            {isAdmin && message.isRead && <CheckCircle className="w-3 h-3" />}
+                        <div className="flex flex-col">
+                          {!isAdmin && (
+                            <span className="text-xs text-gray-500 mb-1 ml-2">
+                              {senderName}
+                            </span>
+                          )}
+                          <div
+                            className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
+                              isAdmin
+                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-br-md'
+                                : 'bg-gray-100 text-gray-900 rounded-bl-md'
+                            }`}
+                          >
+                            <p className="text-sm leading-relaxed">{message.text}</p>
+                            <div className="flex items-center justify-between mt-2 text-xs opacity-75">
+                              <span>{formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}</span>
+                              {isAdmin && message.isRead && <CheckCircle className="w-3 h-3" />}
+                            </div>
                           </div>
                         </div>
                       </div>

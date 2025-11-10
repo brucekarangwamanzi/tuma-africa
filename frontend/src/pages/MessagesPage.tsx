@@ -73,10 +73,16 @@ const MessagesPage: React.FC = () => {
               status: data.message.status
             };
             
-            // Update messages in store
-            useChatStore.setState((state) => ({
-              messages: [...state.messages, newMsg]
-            }));
+            // Update messages in store (avoid duplicates)
+            useChatStore.setState((state) => {
+              const messageExists = state.messages.some(msg => msg.id === newMsg.id);
+              if (messageExists) {
+                return state; // Don't add duplicate
+              }
+              return {
+                messages: [...state.messages, newMsg]
+              };
+            });
             
             // Play notification sound or show notification
             if (data.message.senderId !== user.id) {
