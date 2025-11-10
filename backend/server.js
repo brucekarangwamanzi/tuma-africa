@@ -170,29 +170,17 @@ io.on('connection', (socket) => {
       // Get the saved message
       const savedMessage = chat.messages[chat.messages.length - 1];
       
-      // Emit to all participants
-      chat.participants.forEach(participantId => {
-        io.to(`user:${participantId}`).emit('message:new', {
-          chatId: chat._id,
-          message: {
-            id: savedMessage._id,
-            senderId: socket.userId,
-            content: savedMessage.text,
-            type: savedMessage.type,
-            fileUrl: savedMessage.fileUrl,
-            fileName: savedMessage.fileName,
-            timestamp: savedMessage.createdAt,
-            status: 'sent'
-          }
-        });
-      });
+      // Get sender information
+      const User = require('./models/User');
+      const sender = await User.findById(socket.userId).select('fullName role');
       
-      // Also emit to all admins
-      io.to('admins').emit('message:new', {
+      const messageData = {
         chatId: chat._id,
         message: {
           id: savedMessage._id,
           senderId: socket.userId,
+          senderName: sender?.fullName || 'Unknown',
+          senderRole: sender?.role || 'user',
           content: savedMessage.text,
           type: savedMessage.type,
           fileUrl: savedMessage.fileUrl,
@@ -200,7 +188,15 @@ io.on('connection', (socket) => {
           timestamp: savedMessage.createdAt,
           status: 'sent'
         }
+      };
+      
+      // Emit to all participants
+      chat.participants.forEach(participantId => {
+        io.to(`user:${participantId}`).emit('message:new', messageData);
       });
+      
+      // Also emit to all admins
+      io.to('admins').emit('message:new', messageData);
       
     } catch (error) {
       console.error('Socket message error:', error);

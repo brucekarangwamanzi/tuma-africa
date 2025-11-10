@@ -57,12 +57,14 @@ const MessagesPage: React.FC = () => {
           
           // Listen for new messages
           websocketService.onNewMessage((data) => {
+            console.log('Received WebSocket message:', data);
+            
             // Add message to local state
             const newMsg = {
               id: data.message.id,
               senderId: data.message.senderId,
-              senderName: data.message.senderId === user.id ? user.fullName : 'Support',
-              senderRole: data.message.senderId === user.id ? user.role : 'admin',
+              senderName: data.message.senderName || (data.message.senderId === user.id ? user.fullName : 'Support'),
+              senderRole: data.message.senderRole || (data.message.senderId === user.id ? user.role : 'admin'),
               content: data.message.content,
               type: data.message.type,
               fileUrl: data.message.fileUrl,
@@ -78,7 +80,7 @@ const MessagesPage: React.FC = () => {
             
             // Play notification sound or show notification
             if (data.message.senderId !== user.id) {
-              toast.info('New message from support');
+              toast.info(`New message from ${newMsg.senderName}`);
             }
           });
         }
