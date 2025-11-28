@@ -17,7 +17,8 @@ import {
   PieChart,
   Activity,
   Users,
-  DollarSign
+  DollarSign,
+  User
 } from 'lucide-react';
 import { useOrderStore } from '../../store/orderStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -451,6 +452,35 @@ const AdminOrderManagementPage: React.FC = () => {
                           {getPriorityBadge(order.priority)}
                         </div>
                       </div>
+                      
+                      {/* Customer Information */}
+                      {order.userId && (
+                        <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-blue-100 rounded-lg">
+                              <User className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">
+                                Customer
+                              </p>
+                              <p className="text-base font-bold text-gray-900">
+                                {order.userId.fullName || 'Unknown Customer'}
+                              </p>
+                              {order.userId.email && (
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {order.userId.email}
+                                </p>
+                              )}
+                              {order.userId.phone && (
+                                <p className="text-sm text-gray-600">
+                                  {order.userId.phone}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="mb-4">
                         <h4 className="font-semibold text-gray-900 mb-1">{order.productName}</h4>

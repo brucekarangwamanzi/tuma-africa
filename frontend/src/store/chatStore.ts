@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -11,14 +12,25 @@ interface Message {
   type: 'text' | 'image' | 'file';
   fileUrl?: string;
   fileName?: string;
+  fileSize?: number;
   timestamp: string;
   status: 'sending' | 'sent' | 'delivered' | 'read';
+  replyTo?: {
+    messageId: string;
+    content: string;
+    senderName: string;
+  };
 }
 
 interface SendMessageData {
   content: string;
   type: 'text' | 'file';
   file?: File;
+  replyTo?: {
+    messageId: string;
+    content: string;
+    senderName: string;
+  };
 }
 
 interface ChatState {
@@ -40,14 +52,16 @@ interface ChatState {
   clearError: () => void;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
-  // Initial state
-  messages: [],
-  isLoading: false,
-  isConnected: true, // Assume connected initially (we'll add WebSocket later)
-  unreadCount: 0,
-  currentChatId: null,
-  error: null,
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
+      // Initial state
+      messages: [],
+      isLoading: false,
+      isConnected: true,
+      unreadCount: 0,
+      currentChatId: null,
+      error: null,
 
   // Actions
   fetchMessages: async () => {
@@ -57,8 +71,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await axios.get('/chat/messages');
       const { messages, chatId } = response.data;
       
+      // Ensure messages are sorted by timestamp
+      const sortedMessages = (messages || []).sort((a: Message, b: Message) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      
+      console.log(`📨 Loaded ${sortedMessages.length} messages from server`);
+      
+      // Merge with existing messages to avoid duplicates and preserve any optimistic messages
+      const existingMessages = get().messages;
+      const messageMap = new Map<string, Message>();
+      
+      // Add existing messages first (preserves optimistic messages)
+      existingMessages.forEach(msg => {
+        if (!msg.id.startsWith('temp-')) { // Don't persist temporary messages
+          messageMap.set(msg.id, msg);
+        }
+      });
+      
+      // Add/update with server messages
+      sortedMessages.forEach((msg: Message) => {
+        messageMap.set(msg.id, msg);
+      });
+      
+      // Convert back to array and sort
+      const mergedMessages = Array.from(messageMap.values()).sort((a, b) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      
       set({
-        messages: messages || [],
+        messages: mergedMessages,
         currentChatId: chatId,
         isLoading: false,
         unreadCount: 0
@@ -67,9 +109,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return chatId;
     } catch (error: any) {
       console.error('Failed to fetch messages:', error);
+      // Don't clear messages on error - keep what we have
       set({
         error: error.response?.data?.message || 'Failed to fetch messages',
-        isLoading: false
+        isLoading: false,
+        // Keep existing messages on error
       });
       return null;
     }
@@ -179,11 +223,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   clearMessages: () => {
+    // Only clear messages when explicitly needed (e.g., logout)
+    // Don't clear on navigation - messages should persist
     set({ 
       messages: [], 
       currentChatId: null,
       unreadCount: 0 
     });
+    console.log('🗑️ Messages cleared from store');
   },
 
   setConnected: (connected: boolean) => {
@@ -193,4 +240,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
   clearError: () => {
     set({ error: null });
   }
-}));
+    }),
+    {
+      name: 'chat-storage',
+      // Only persist messages and chatId, not loading states
+      partialize: (state) => ({
+        messages: state.messages,
+        currentChatId: state.currentChatId,
+        unreadCount: state.unreadCount,
+      }),
+      // On rehydration, merge persisted messages with fresh fetch
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          console.log(`📦 Restored ${state.messages.length} messages from localStorage`);
+          // Messages will be refreshed from server on page load, but we keep them for instant display
+        }
+      },
+    }
+  )
+);

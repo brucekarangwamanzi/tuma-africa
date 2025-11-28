@@ -9,27 +9,33 @@ A visual product location tracking system has been added to show where products 
 ## 🗺️ What It Shows
 
 ### Location Stages:
+
 1. **Order Received** (Pending)
+
    - Location: Order Processing
    - Icon: Clock
    - Description: Order is being reviewed
 
 2. **Order Approved** (Approved)
+
    - Location: Order Approved
    - Icon: CheckCircle
    - Description: Order approved, ready to purchase
 
 3. **Supplier (Asia)** (Purchased)
+
    - Location: Supplier in Asia
    - Icon: Package
    - Description: Product purchased from supplier
 
 4. **Warehouse (Transit)** (Warehouse)
+
    - Location: Transit Warehouse
    - Icon: Warehouse
    - Description: Product in transit warehouse
 
 5. **In Transit to Africa** (Shipped)
+
    - Location: Shipping to Destination
    - Icon: Truck
    - Description: Product shipped to destination
@@ -44,6 +50,7 @@ A visual product location tracking system has been added to show where products 
 ## 📱 Where to Find It
 
 ### For Users:
+
 **Order Detail Page:** http://localhost:3000/orders/:orderId
 
 1. Log in to your account
@@ -52,6 +59,7 @@ A visual product location tracking system has been added to show where products 
 4. Scroll down to see "Product Location" section
 
 ### For Admins:
+
 **Admin Order Management:** http://localhost:3000/admin/orders
 
 1. Log in as admin/super admin
@@ -64,6 +72,7 @@ A visual product location tracking system has been added to show where products 
 ## 🎨 Visual Features
 
 ### Desktop View (Horizontal Timeline):
+
 ```
 ○━━━━━○━━━━━○━━━━━○━━━━━○━━━━━○
 Pending  Approved  Purchased  Warehouse  Shipped  Delivered
@@ -77,6 +86,7 @@ Pending  Approved  Purchased  Warehouse  Shipped  Delivered
 - Completed stages marked with checkmark
 
 ### Mobile View (Vertical Timeline):
+
 ```
 ○  Pending
 │  Order is being reviewed
@@ -98,23 +108,27 @@ Pending  Approved  Purchased  Warehouse  Shipped  Delivered
 ## 📊 Information Displayed
 
 ### Current Status:
+
 - Active stage highlighted with ring effect
 - Larger icon for current stage
 - Color-coded progress
 
 ### Tracking Information:
+
 - Tracking number (if available)
 - Carrier name
 - Estimated delivery date
 - Stage completion dates
 
 ### Progress Indicator:
+
 - Visual progress bar
 - Percentage completion
 - Completed stages marked
 - Upcoming stages grayed out
 
 ### Current Location Details:
+
 - Detailed description of current stage
 - Location information
 - Status updates
@@ -124,6 +138,7 @@ Pending  Approved  Purchased  Warehouse  Shipped  Delivered
 ## 🎯 How It Works
 
 ### Stage Progression:
+
 1. Order starts at "Pending"
 2. Admin approves → moves to "Approved"
 3. Product purchased → moves to "Purchased"
@@ -132,12 +147,14 @@ Pending  Approved  Purchased  Warehouse  Shipped  Delivered
 6. Customer receives → moves to "Delivered"
 
 ### Visual Indicators:
+
 - **Gray** = Not yet reached
 - **Blue** = Current stage (with ring effect)
 - **Green checkmark** = Completed stages
 - **Progress bar** = Overall completion
 
 ### Dates:
+
 - Each completed stage shows completion date
 - Estimated delivery date displayed at bottom
 - Relative time (e.g., "2 days ago")
@@ -147,26 +164,29 @@ Pending  Approved  Purchased  Warehouse  Shipped  Delivered
 ## 💻 Technical Details
 
 ### Component:
+
 `frontend/src/components/admin/ProductLocationMap.tsx`
 
 ### Props:
+
 ```typescript
 interface ProductLocationMapProps {
-  currentStatus: string;           // Current order status
+  currentStatus: string; // Current order status
   trackingInfo?: {
-    trackingNumber?: string;        // Tracking number
-    carrier?: string;               // Shipping carrier
-    estimatedDelivery?: string;     // Estimated delivery date
+    trackingNumber?: string; // Tracking number
+    carrier?: string; // Shipping carrier
+    estimatedDelivery?: string; // Estimated delivery date
   };
   stageHistory?: Array<{
-    stage: string;                  // Stage name
-    timestamp: string;              // When stage was reached
-    notes?: string;                 // Optional notes
+    stage: string; // Stage name
+    timestamp: string; // When stage was reached
+    notes?: string; // Optional notes
   }>;
 }
 ```
 
 ### Usage:
+
 ```tsx
 <ProductLocationMap
   currentStatus={order.status}
@@ -180,18 +200,21 @@ interface ProductLocationMapProps {
 ## 🎨 Styling
 
 ### Colors:
+
 - Primary: Blue (#3b82f6)
 - Success: Green (#10b981)
 - Warning: Orange (#f59e0b)
 - Inactive: Gray (#9ca3af)
 
 ### Responsive:
+
 - Desktop: Horizontal timeline (≥768px)
 - Mobile: Vertical timeline (<768px)
 - Smooth transitions
 - Touch-friendly buttons
 
 ### Animations:
+
 - Progress bar fills smoothly
 - Active stage scales up
 - Ring pulse effect
@@ -202,18 +225,21 @@ interface ProductLocationMapProps {
 ## 📸 Example Views
 
 ### When Order is "Purchased":
+
 ```
 ✓ Pending → ✓ Approved → ● Purchased → Warehouse → Shipped → Delivered
                           ↑ You are here
 ```
 
 ### When Order is "Shipped":
+
 ```
 ✓ Pending → ✓ Approved → ✓ Purchased → ✓ Warehouse → ● Shipped → Delivered
                                                         ↑ You are here
 ```
 
 ### Tracking Info Display:
+
 ```
 ┌─────────────────────────────────────────┐
 │ 📍 Product Location                     │
@@ -232,14 +258,18 @@ interface ProductLocationMapProps {
 ## 🔧 Admin Features
 
 ### Update Order Status:
+
 When admin updates order status in the system:
+
 1. Status changes in database
 2. Stage history automatically updated
 3. Location map updates in real-time
 4. User sees new location immediately
 
 ### Add Tracking Info:
+
 Admin can add:
+
 - Tracking number
 - Carrier name
 - Estimated delivery date
@@ -250,6 +280,7 @@ Admin can add:
 ## ✨ Benefits
 
 ### For Users:
+
 - ✅ Know exactly where their product is
 - ✅ See estimated delivery date
 - ✅ Track progress visually
@@ -257,6 +288,7 @@ Admin can add:
 - ✅ Plan for delivery
 
 ### For Admins:
+
 - ✅ Clear status visualization
 - ✅ Easy to explain to customers
 - ✅ Professional appearance
@@ -264,6 +296,7 @@ Admin can add:
 - ✅ Builds trust
 
 ### For Business:
+
 - ✅ Transparency
 - ✅ Customer satisfaction
 - ✅ Reduced inquiries
@@ -275,6 +308,7 @@ Admin can add:
 ## 🚀 Testing
 
 ### Test the Feature:
+
 1. **Create an order** as a user
 2. **View order details** - see "Pending" stage
 3. **Admin approves** order
@@ -284,6 +318,7 @@ Admin can add:
 7. **Continue through stages** - watch it update
 
 ### Test Scenarios:
+
 - New order (Pending)
 - Approved order
 - Purchased order (in Asia)
@@ -296,6 +331,7 @@ Admin can add:
 ## 📱 Mobile Responsive
 
 ### Features:
+
 - ✅ Vertical timeline on mobile
 - ✅ Touch-friendly icons
 - ✅ Readable text sizes
@@ -304,6 +340,7 @@ Admin can add:
 - ✅ No horizontal scroll
 
 ### Breakpoints:
+
 - Mobile: < 768px (Vertical)
 - Desktop: ≥ 768px (Horizontal)
 
@@ -312,6 +349,7 @@ Admin can add:
 ## 🎯 Future Enhancements
 
 ### Possible Additions:
+
 - Real-time GPS tracking
 - Map integration (Google Maps)
 - Push notifications on status change
@@ -327,13 +365,17 @@ Admin can add:
 ## 📞 Support
 
 ### For Users:
+
 If you don't see the location map:
+
 1. Refresh the page
 2. Check if order has been approved
 3. Contact support if issue persists
 
 ### For Admins:
+
 To update location:
+
 1. Go to Order Management
 2. Click on order
 3. Update status
@@ -347,6 +389,7 @@ To update location:
 **Feature Status:** ✅ Fully Implemented and Working
 
 **Available On:**
+
 - ✅ User Order Detail Page
 - ✅ Admin Order Management
 - ✅ Mobile and Desktop

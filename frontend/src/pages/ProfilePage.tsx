@@ -211,6 +211,27 @@ const ProfilePage: React.FC = () => {
                     {user.approved ? 'Approved' : 'Pending'}
                   </div>
                 </div>
+                
+                {!user.verified && (
+                  <div className="mt-4 p-3 bg-warning-50 border border-warning-200 rounded-lg">
+                    <p className="text-xs text-warning-800 mb-2">
+                      Please verify your email address to access all features.
+                    </p>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await axios.post('/users/verify-email');
+                          toast.success('Verification email sent! Please check your inbox.');
+                        } catch (error: any) {
+                          toast.error(error.response?.data?.message || 'Failed to send verification email');
+                        }
+                      }}
+                      className="text-xs text-warning-700 hover:text-warning-900 font-medium underline"
+                    >
+                      Resend Verification Email
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

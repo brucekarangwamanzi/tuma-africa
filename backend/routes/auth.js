@@ -1,8 +1,10 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
 const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
 const { authenticateToken } = require('../middleware/auth');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 
 const router = express.Router();
 
@@ -54,7 +56,41 @@ router.post('/register', validateUserRegistration, async (req, res) => {
       approved: false
     });
 
+    // Generate email verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date();
+    verificationExpires.setHours(verificationExpires.getHours() + 24); // 24 hours expiry
+
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = verificationExpires;
+
     await user.save();
+
+    // Send verification email
+    let emailSent = false;
+    let verificationUrl = '';
+    try {
+      const emailResult = await sendVerificationEmail(user.email, verificationToken, user.fullName);
+      if (emailResult.success) {
+        console.log(`✅ Verification email sent to ${user.email}`);
+        emailSent = true;
+        if (emailResult.verificationUrl) {
+          verificationUrl = emailResult.verificationUrl;
+        }
+      } else {
+        console.warn(`⚠️ Failed to send verification email to ${user.email}:`, emailResult.error);
+        if (process.env.NODE_ENV === 'development' && emailResult.debug) {
+          console.log('📧 Development mode - Email not configured');
+          console.log('📧 Verification token:', verificationToken);
+          verificationUrl = emailResult.verificationUrl || `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+          console.log('📧 Manual verification URL:', verificationUrl);
+        }
+      }
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Don't fail registration if email fails, but log it
+      verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    }
 
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user._id, user.role);
@@ -63,8 +99,12 @@ router.post('/register', validateUserRegistration, async (req, res) => {
     user.refreshToken = refreshToken;
     await user.save();
 
-    res.status(201).json({
-      message: 'Registration successful. Please wait for admin approval.',
+    const responseMessage = emailSent 
+      ? 'Registration successful! Please check your email to verify your account.'
+      : 'Registration successful! Email service not configured. Please contact support for account verification.';
+    
+    const response = {
+      message: responseMessage,
       user: {
         id: user._id,
         fullName: user.fullName,
@@ -76,7 +116,18 @@ router.post('/register', validateUserRegistration, async (req, res) => {
       },
       accessToken,
       refreshToken
-    });
+    };
+    
+    // In development, include verification URL if email wasn't sent
+    if (!emailSent && process.env.NODE_ENV === 'development' && verificationUrl) {
+      response.debug = {
+        message: 'Email service not configured. Use this URL to verify:',
+        verificationUrl: verificationUrl,
+        verificationToken: verificationToken
+      };
+    }
+    
+    res.status(201).json(response);
 
   } catch (error) {
     console.error('Registration error:', error);
@@ -251,15 +302,20 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    // Generate reset token (implement email sending logic here)
+    // Generate reset token
     const resetToken = jwt.sign(
       { userId: user._id, purpose: 'password-reset' },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    // In production, send email with reset link
-    console.log(`Password reset token for ${email}: ${resetToken}`);
+    // Send password reset email
+    try {
+      await sendPasswordResetEmail(user.email, resetToken, user.fullName);
+      console.log(`✅ Password reset email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('Failed to send password reset email:', emailError);
+    }
 
     res.json({ 
       message: 'If an account with that email exists, a password reset link has been sent.',

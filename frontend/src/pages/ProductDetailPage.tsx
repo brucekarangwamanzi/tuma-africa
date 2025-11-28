@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Star, Eye, ShoppingBag, Heart, Share2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Star, Eye, ShoppingBag, Heart, Share2, ExternalLink, Plus, Minus } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -114,9 +114,10 @@ const ProductDetailPage: React.FC = () => {
 
     const orderParams = new URLSearchParams({
       product: product?.name || '',
-      link: product?.imageUrl || '',
       price: product?.price.toString() || '0',
-      quantity: quantity.toString()
+      quantity: quantity.toString(),
+      fromWebsite: 'true',
+      productId: product?._id || ''
     });
 
     navigate(`/orders/new?${orderParams.toString()}`);
@@ -307,48 +308,87 @@ const ProductDetailPage: React.FC = () => {
             </div>
 
             {/* Stock & Quantity */}
-            <div className="space-y-4">
+            <div className="bg-gray-50 rounded-xl p-6 space-y-5 border border-gray-200">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700">Availability:</span>
-                <span className={`text-sm font-medium ${
-                  product.stock.available ? 'text-success-600' : 'text-error-600'
+                <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
+                  product.stock.available 
+                    ? 'text-green-700 bg-green-100' 
+                    : 'text-red-700 bg-red-100'
                 }`}>
-                  {product.stock.available ? 'In Stock' : 'Out of Stock'}
+                  {product.stock.available ? '✓ In Stock' : '✗ Out of Stock'}
                 </span>
               </div>
 
               {product.stock.minOrderQuantity > 1 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">Minimum Order:</span>
-                  <span className="text-sm text-gray-600">
+                <div className="flex items-center justify-between bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <span className="text-sm font-medium text-blue-700">Minimum Order:</span>
+                  <span className="text-sm font-semibold text-blue-900">
                     {product.stock.minOrderQuantity} pieces
                   </span>
                 </div>
               )}
 
-              <div className="flex items-center space-x-4">
-                <label className="text-sm font-medium text-gray-700">Quantity:</label>
-                <div className="flex items-center border border-gray-300 rounded-md">
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-gray-900">Select Quantity:</label>
+                <div className="flex items-center space-x-3">
                   <button
-                    onClick={() => setQuantity(Math.max(product.stock.minOrderQuantity, quantity - 1))}
-                    className="px-3 py-1 text-gray-600 hover:text-gray-800"
-                    disabled={quantity <= product.stock.minOrderQuantity}
+                    onClick={() => setQuantity(Math.max(product.stock.minOrderQuantity || 1, quantity - 1))}
+                    disabled={quantity <= (product.stock.minOrderQuantity || 1)}
+                    className="flex items-center justify-center w-10 h-10 rounded-lg border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-primary-600 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 touch-manipulation active:scale-95"
+                    aria-label="Decrease quantity"
                   >
-                    -
+                    <Minus className="w-5 h-5" />
                   </button>
-                  <input
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(Math.max(product.stock.minOrderQuantity, parseInt(e.target.value) || 1))}
-                    className="w-16 px-2 py-1 text-center border-0 focus:ring-0"
-                    min={product.stock.minOrderQuantity}
-                  />
+                  
+                  <div className="flex-1">
+                    <input
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => {
+                        const newValue = parseInt(e.target.value) || (product.stock.minOrderQuantity || 1);
+                        setQuantity(Math.max(product.stock.minOrderQuantity || 1, newValue));
+                      }}
+                      className="w-full px-4 py-3 text-center text-lg font-semibold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                      min={product.stock.minOrderQuantity || 1}
+                      max={product.stock.quantity || 9999}
+                    />
+                    <p className="text-xs text-gray-500 mt-1 text-center">
+                      {product.stock.quantity ? `Max: ${product.stock.quantity} available` : ''}
+                    </p>
+                  </div>
+                  
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="px-3 py-1 text-gray-600 hover:text-gray-800"
+                    onClick={() => {
+                      const maxQty = product.stock.quantity || 9999;
+                      if (quantity < maxQty) {
+                        setQuantity(quantity + 1);
+                      }
+                    }}
+                    disabled={product.stock.quantity ? quantity >= product.stock.quantity : false}
+                    className="flex items-center justify-center w-10 h-10 rounded-lg border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-primary-600 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 touch-manipulation active:scale-95"
+                    aria-label="Increase quantity"
                   >
-                    +
+                    <Plus className="w-5 h-5" />
                   </button>
+                </div>
+                
+                {/* Total Price Preview */}
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Subtotal ({quantity} {quantity === 1 ? 'item' : 'items'}):</span>
+                    <span className="text-lg font-bold text-primary-600">
+                      ${(product.price * quantity).toFixed(2)}
+                    </span>
+                  </div>
+                  {product.shipping?.cost && (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                      <span className="text-sm text-gray-600">Shipping:</span>
+                      <span className="text-sm font-medium text-gray-700">
+                        ${product.shipping.cost.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -365,7 +405,7 @@ const ProductDetailPage: React.FC = () => {
               </button>
               
               <Link
-                to={`/orders/new?product=${encodeURIComponent(product.name)}&link=${encodeURIComponent(product.imageUrl)}&price=${product.price}&quantity=${quantity}`}
+                to={`/orders/new?product=${encodeURIComponent(product.name)}&price=${product.price}&quantity=${quantity}&fromWebsite=true&productId=${product._id}`}
                 className="btn-outline w-full btn-lg text-center"
               >
                 Get Custom Quote

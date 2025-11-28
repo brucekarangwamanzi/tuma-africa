@@ -126,40 +126,34 @@ const OrdersPage: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
+    const statusConfig: Record<string, { bg: string; text: string }> = {
       pending: { 
         bg: 'bg-yellow-100', 
-        text: 'text-yellow-800',
-        icon: <Clock className="w-3 h-3" />
+        text: 'text-yellow-800'
       },
       processing: { 
-        bg: 'bg-blue-100', 
-        text: 'text-blue-800',
-        icon: <RefreshCw className="w-3 h-3" />
+        bg: 'bg-gray-100', 
+        text: 'text-gray-800'
       },
       shipped: { 
         bg: 'bg-purple-100', 
-        text: 'text-purple-800',
-        icon: <Truck className="w-3 h-3" />
+        text: 'text-purple-800'
       },
       delivered: { 
         bg: 'bg-green-100', 
-        text: 'text-green-800',
-        icon: <CheckCircle className="w-3 h-3" />
+        text: 'text-green-800'
       },
       cancelled: { 
         bg: 'bg-red-100', 
-        text: 'text-red-800',
-        icon: <AlertCircle className="w-3 h-3" />
+        text: 'text-red-800'
       }
     };
     
-    const config = statusConfig[status] || { bg: 'bg-gray-100', text: 'text-gray-800', icon: null };
+    const config = statusConfig[status] || { bg: 'bg-gray-100', text: 'text-gray-800' };
     
     return (
-      <span className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-        {config.icon}
-        <span>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
   };
@@ -190,144 +184,149 @@ const OrdersPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 flex items-center">
-                <div className="p-3 bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl mr-4">
-                  <Package className="w-8 h-8 text-white" />
-                </div>
-                My Orders
-              </h1>
-              <p className="mt-3 text-lg text-gray-600">
-                Track and manage all your orders in one place
-              </p>
+    <div className="min-h-screen bg-gray-50 pb-4 sm:pb-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+        {/* Mobile-Optimized Header */}
+        <div className="mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 sm:p-3 bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg sm:rounded-xl">
+                <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
+                  My Orders
+                </h1>
+                <p className="hidden sm:block mt-1 text-sm lg:text-base text-gray-600">
+                  Track and manage all your orders
+                </p>
+              </div>
             </div>
             
-            <div className="mt-6 sm:mt-0 flex space-x-3">
+            <div className="flex space-x-2 sm:space-x-3">
               <button
                 onClick={loadOrders}
-                className="flex items-center px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+                className="flex items-center px-3 sm:px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg sm:rounded-xl hover:bg-gray-50 transition-colors shadow-sm touch-manipulation"
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
+                <RefreshCw className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Refresh</span>
               </button>
               <Link
                 to="/orders/new"
-                className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                className="flex items-center px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg touch-manipulation"
               >
-                <Plus className="w-5 h-5 mr-2" />
-                New Order
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                <span className="hidden sm:inline">New Order</span>
+                <span className="sm:hidden">New</span>
               </Link>
             </div>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <ShoppingCart className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-              </div>
-              <div className="p-3 bg-yellow-100 rounded-full">
-                <Clock className="w-6 h-6 text-yellow-600" />
+        {/* Stats Cards - Horizontal Scroll on Mobile */}
+        <div className="mb-4 sm:mb-6">
+          <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4 overflow-x-auto pb-2 sm:pb-0 -mx-3 sm:mx-0 px-3 sm:px-0 scrollbar-hide">
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 min-w-[140px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Total</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</p>
+                </div>
+                <div className="p-2 sm:p-3 bg-blue-100 rounded-full">
+                  <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Processing</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.processing}</p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-full">
-                <RefreshCw className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Shipped</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.shipped}</p>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-full">
-                <Truck className="w-6 h-6 text-purple-600" />
+            
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 min-w-[140px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Pending</p>
+                  <p className="text-xl sm:text-2xl font-bold text-yellow-600">{stats.pending}</p>
+                </div>
+                <div className="p-2 sm:p-3 bg-yellow-100 rounded-full">
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Delivered</p>
-                <p className="text-2xl font-bold text-green-600">{stats.delivered}</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <CheckCircle className="w-6 h-6 text-green-600" />
+            
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 min-w-[140px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Processing</p>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600">{stats.processing}</p>
+                </div>
+                <div className="p-2 sm:p-3 bg-blue-100 rounded-full">
+                  <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Value</p>
-                <p className="text-2xl font-bold text-green-600">${(stats.totalValue || 0).toLocaleString()}</p>
+            
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 min-w-[140px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Shipped</p>
+                  <p className="text-xl sm:text-2xl font-bold text-purple-600">{stats.shipped}</p>
+                </div>
+                <div className="p-2 sm:p-3 bg-purple-100 rounded-full">
+                  <Truck className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                </div>
               </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <TrendingUp className="w-6 h-6 text-green-600" />
+            </div>
+            
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 min-w-[140px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Delivered</p>
+                  <p className="text-xl sm:text-2xl font-bold text-green-600">{stats.delivered}</p>
+                </div>
+                <div className="p-2 sm:p-3 bg-green-100 rounded-full">
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 min-w-[140px] sm:min-w-0 flex-shrink-0 sm:flex-shrink">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Total Value</p>
+                  <p className="text-lg sm:text-xl font-bold text-green-600">${(stats.totalValue || 0).toLocaleString()}</p>
+                </div>
+                <div className="p-2 sm:p-3 bg-green-100 rounded-full">
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
-          <div className="p-6">
-            <form onSubmit={handleSearch} className="flex flex-col lg:flex-row gap-4">
+        {/* Search and Filters - Mobile Optimized */}
+        <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 mb-4 sm:mb-6">
+          <div className="p-3 sm:p-4 lg:p-6">
+            <form onSubmit={handleSearch} className="flex flex-col gap-3">
               <div className="flex-1">
                 <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
                   <input
                     type="text"
-                    placeholder="Search by order ID, product name, or description..."
+                    placeholder="Search orders..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors"
+                    className="w-full pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg sm:rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 focus:bg-white transition-colors text-base sm:text-sm"
                   />
                 </div>
               </div>
               
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex items-center space-x-2 bg-gray-50 rounded-xl px-3 py-3 border border-gray-300">
-                  <Filter className="w-4 h-4 text-gray-500" />
+              <div className="flex flex-wrap gap-2 sm:gap-3">
+                <div className="flex items-center space-x-2 bg-gray-50 rounded-lg sm:rounded-xl px-3 py-2 sm:py-2.5 border border-gray-300 flex-1 min-w-[140px]">
+                  <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
                   <select
                     value={statusFilter}
                     onChange={(e) => {
                       setStatusFilter(e.target.value);
                       handleFilterChange('status', e.target.value);
                     }}
-                    className="border-none focus:ring-0 focus:outline-none bg-transparent text-sm font-medium"
+                    className="border-none focus:ring-0 focus:outline-none bg-transparent text-sm font-medium w-full"
                   >
                     <option value="">All Status</option>
                     <option value="pending">Pending</option>
@@ -338,15 +337,15 @@ const OrdersPage: React.FC = () => {
                   </select>
                 </div>
                 
-                <div className="flex items-center space-x-2 bg-gray-50 rounded-xl px-3 py-3 border border-gray-300">
-                  <Star className="w-4 h-4 text-gray-500" />
+                <div className="flex items-center space-x-2 bg-gray-50 rounded-lg sm:rounded-xl px-3 py-2 sm:py-2.5 border border-gray-300 flex-1 min-w-[140px]">
+                  <Star className="w-4 h-4 text-gray-500 flex-shrink-0" />
                   <select
                     value={priorityFilter}
                     onChange={(e) => {
                       setPriorityFilter(e.target.value);
                       handleFilterChange('priority', e.target.value);
                     }}
-                    className="border-none focus:ring-0 focus:outline-none bg-transparent text-sm font-medium"
+                    className="border-none focus:ring-0 focus:outline-none bg-transparent text-sm font-medium w-full"
                   >
                     <option value="">All Priority</option>
                     <option value="low">Low</option>
@@ -355,28 +354,21 @@ const OrdersPage: React.FC = () => {
                     <option value="urgent">Urgent</option>
                   </select>
                 </div>
-                
-                <button 
-                  type="submit" 
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow-md"
-                >
-                  <Filter className="w-4 h-4" />
-                </button>
               </div>
             </form>
           </div>
         </div>
 
-        {/* Orders List */}
-        <div className="space-y-6">
+        {/* Orders List - Mobile Optimized */}
+        <div className="space-y-3 sm:space-y-4">
           {orders.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="text-center py-16 px-6">
-                <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-                  <Package className="w-10 h-10 text-gray-400" />
+            <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200">
+              <div className="text-center py-12 sm:py-16 px-4 sm:px-6">
+                <div className="bg-gray-100 rounded-full w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 sm:mb-6 flex items-center justify-center">
+                  <Package className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">No orders found</h3>
-                <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">No orders found</h3>
+                <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8 max-w-md mx-auto">
                   {searchQuery || statusFilter || priorityFilter
                     ? 'Try adjusting your search or filters to find what you\'re looking for'
                     : 'You haven\'t placed any orders yet. Start shopping to see your orders here!'}
@@ -390,159 +382,87 @@ const OrdersPage: React.FC = () => {
                         setPriorityFilter('');
                         setSearchParams({});
                       }}
-                      className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                      className="px-5 sm:px-6 py-2.5 sm:py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg sm:rounded-xl transition-colors touch-manipulation"
                     >
                       Clear Filters
                     </button>
                   )}
                   <Link 
                     to="/orders/new" 
-                    className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                    className="px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg sm:rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg touch-manipulation"
                   >
-                    <Plus className="w-5 h-5 mr-2 inline" />
-                    Place Your First Order
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2 inline" />
+                    <span className="hidden sm:inline">Place Your First Order</span>
+                    <span className="sm:hidden">New Order</span>
                   </Link>
                 </div>
               </div>
             </div>
           ) : (
-            orders.map((order) => (
-              <div key={order._id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 overflow-hidden">
-                <div className="p-6">
-                  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
-                    <div className="flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-                        <div className="flex items-center space-x-3 mb-2 sm:mb-0">
-                          <div className="p-2 bg-blue-100 rounded-lg">
-                            <Package className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900">
-                              {order.orderId}
-                            </h3>
-                            <p className="text-sm text-gray-500">
-                              Order placed {new Date(order.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
+            <div className="space-y-3 sm:space-y-4">
+              {orders.map((order) => (
+                <Link
+                  key={order._id}
+                  to={`/orders/${order._id}`}
+                  className="block bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 active:scale-[0.98] touch-manipulation"
+                >
+                  <div className="p-4 sm:p-5">
+                    {/* Mobile-Optimized Order Card */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        {/* Product Name - Prominent */}
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                          {order.productName}
+                        </h3>
                         
-                        <div className="flex items-center space-x-2">
-                          {getStatusBadge(order.status)}
-                          {getPriorityBadge(order.priority)}
+                        {/* Order Number */}
+                        <p className="text-xs sm:text-sm text-gray-500 mb-1">
+                          Order #{order.orderId}
+                        </p>
+                        
+                        {/* Date and Price Row */}
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                          <p className="text-xs sm:text-sm text-gray-600">
+                            {new Date(order.createdAt).toLocaleDateString('en-US', { 
+                              month: 'numeric', 
+                              day: 'numeric', 
+                              year: 'numeric' 
+                            })}
+                          </p>
+                          <p className="text-base sm:text-lg font-bold text-gray-900">
+                            ${(order.finalAmount || 0).toLocaleString()}
+                          </p>
                         </div>
                       </div>
                       
-                      <div className="mb-4">
-                        <h4 className="font-semibold text-gray-900 mb-1">{order.productName}</h4>
-                        {order.description && (
-                          <p className="text-gray-600 text-sm">{order.description}</p>
-                        )}
-                        {order.productLink && (
-                          <a 
-                            href={order.productLink} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-700 text-sm underline"
-                          >
-                            View Product
-                          </a>
-                        )}
+                      {/* Status Badge - Right Side */}
+                      <div className="flex-shrink-0">
+                        {getStatusBadge(order.status)}
                       </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                          <Package className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-gray-500">Quantity</p>
-                            <p className="font-semibold text-gray-900">{order.quantity}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                          <DollarSign className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-gray-500">Unit Price</p>
-                            <p className="font-semibold text-gray-900">${(order.unitPrice || 0).toLocaleString()}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                          <Truck className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-gray-500">Shipping</p>
-                            <p className="font-semibold text-gray-900">${(order.shippingCost || 0).toLocaleString()}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
-                          <DollarSign className="w-4 h-4 text-green-600" />
-                          <div>
-                            <p className="text-green-600">Total</p>
-                            <p className="font-bold text-green-700">${(order.finalAmount || 0).toLocaleString()}</p>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {order.trackingInfo?.trackingNumber && (
-                        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <MapPin className="w-5 h-5 text-blue-600" />
-                              <div>
-                                <p className="font-medium text-blue-900">Tracking Information</p>
-                                <p className="text-sm text-blue-700">
-                                  {order.trackingInfo.carrier}: {order.trackingInfo.trackingNumber}
-                                </p>
-                                {order.trackingInfo.estimatedDelivery && (
-                                  <p className="text-xs text-blue-600">
-                                    Est. delivery: {new Date(order.trackingInfo.estimatedDelivery).toLocaleDateString()}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="mt-6 xl:mt-0 xl:ml-8 flex flex-col sm:flex-row xl:flex-col gap-3">
-                      <Link
-                        to={`/orders/${order._id}`}
-                        className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow-md"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Details
-                      </Link>
-                      
-                      {order.status === 'shipped' && order.trackingInfo?.trackingNumber && (
-                        <button className="flex items-center justify-center px-6 py-3 text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors">
-                          <Truck className="w-4 h-4 mr-2" />
-                          Track Package
-                        </button>
-                      )}
                     </div>
                   </div>
-                </div>
-              </div>
-            ))
+                </Link>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Pagination */}
+        {/* Pagination - Mobile Optimized */}
         {pagination && pagination.pages > 1 && (
-          <div className="mt-12 flex justify-center">
-            <nav className="flex items-center space-x-1 bg-white rounded-xl shadow-sm border border-gray-200 p-2">
+          <div className="mt-6 sm:mt-8 lg:mt-12 flex justify-center">
+            <nav className="flex items-center space-x-1 sm:space-x-2 bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-2 sm:p-3">
               {pagination.hasPrev && (
                 <Link
                   to={`?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: String(pagination.current - 1) })}`}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation"
                 >
-                  Previous
+                  <span className="hidden sm:inline">Previous</span>
+                  <span className="sm:hidden">Prev</span>
                 </Link>
               )}
               
-              <div className="flex items-center space-x-1 px-4">
-                {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+              <div className="flex items-center space-x-1 px-2 sm:px-4">
+                {Array.from({ length: Math.min(3, pagination.pages) }, (_, i) => {
                   const pageNum = i + 1;
                   const isActive = pageNum === pagination.current;
                   
@@ -550,7 +470,7 @@ const OrdersPage: React.FC = () => {
                     <Link
                       key={pageNum}
                       to={`?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: String(pageNum) })}`}
-                      className={`w-8 h-8 flex items-center justify-center text-sm font-medium rounded-lg transition-colors ${
+                      className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-xs sm:text-sm font-medium rounded-lg transition-colors touch-manipulation ${
                         isActive 
                           ? 'bg-blue-600 text-white' 
                           : 'text-gray-700 hover:bg-gray-100'
@@ -561,12 +481,12 @@ const OrdersPage: React.FC = () => {
                   );
                 })}
                 
-                {pagination.pages > 5 && (
+                {pagination.pages > 3 && (
                   <>
-                    <span className="px-2 text-gray-500">...</span>
+                    <span className="px-1 sm:px-2 text-gray-500 text-xs sm:text-sm">...</span>
                     <Link
                       to={`?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: String(pagination.pages) })}`}
-                      className="w-8 h-8 flex items-center justify-center text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation"
                     >
                       {pagination.pages}
                     </Link>
@@ -574,14 +494,14 @@ const OrdersPage: React.FC = () => {
                 )}
               </div>
               
-              <div className="px-3 py-2 text-sm font-medium text-gray-600 bg-gray-50 rounded-lg">
+              <div className="hidden sm:block px-3 py-2 text-xs sm:text-sm font-medium text-gray-600 bg-gray-50 rounded-lg">
                 Page {pagination.current} of {pagination.pages}
               </div>
               
               {pagination.hasNext && (
                 <Link
                   to={`?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: String(pagination.current + 1) })}`}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation"
                 >
                   Next
                 </Link>

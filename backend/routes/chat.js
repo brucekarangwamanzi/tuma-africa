@@ -1,7 +1,9 @@
 const express = require('express');
 const Chat = require('../models/Chat');
+const User = require('../models/User');
 const { authenticateToken, requireRole, requireApproval } = require('../middleware/auth');
 const { validateChatMessage, validatePagination } = require('../middleware/validation');
+const { createMessageNotification } = require('../utils/notifications');
 
 const router = express.Router();
 const multer = require('multer');
@@ -116,53 +118,141 @@ router.post('/messages', authenticateToken, upload.single('file'), async (req, r
 // @access  Private
 router.get('/messages', authenticateToken, async (req, res) => {
   try {
-    // Find or create user's support chat
-    let chat = await Chat.findOne({
-      participants: req.user._id,
-      chatType: 'support'
-    }).populate('participants', 'fullName email role');
+    const User = require('../models/User');
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
+    
+    if (isAdmin) {
+      // Admin view: Get all support chats
+      const chats = await Chat.find({
+        chatType: 'support'
+      }).populate('participants', 'fullName email role');
 
-    if (!chat) {
-      // Create new support chat
-      const admin = await require('../models/User').findOne({ 
-        role: { $in: ['admin', 'super_admin'] }, 
-        isActive: true 
-      });
+      // Collect all messages from all chats with proper sender info
+      const allMessages = [];
       
-      const participants = [req.user._id];
-      if (admin) participants.push(admin._id);
+      for (const chat of chats) {
+        for (const msg of chat.messages) {
+          const sender = chat.participants.find(p => p._id.toString() === msg.sender?.toString());
+          
+          allMessages.push({
+            id: msg._id.toString(),
+            senderId: msg.sender?.toString() || 'unknown',
+            senderName: sender?.fullName || 'Unknown',
+            senderRole: sender?.role || 'user',
+            content: msg.text || '',
+            type: msg.type || 'text',
+            fileUrl: msg.fileUrl,
+            fileName: msg.fileName,
+            fileSize: msg.fileSize,
+            timestamp: msg.createdAt,
+            status: msg.isRead ? 'read' : 'delivered',
+            chatId: chat._id.toString()
+          });
+        }
+      }
 
-      chat = new Chat({
-        participants,
-        chatType: 'support',
-        title: 'Support Chat',
-        status: 'open',
-        priority: 'medium',
-        messages: []
+      // Sort by timestamp
+      allMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      res.json({
+        messages: allMessages,
+        chatId: chats[0]?._id || null
       });
 
-      await chat.save();
-      await chat.populate('participants', 'fullName email role');
+    } else {
+      // User view: Get their support chat - Enhanced to ensure we find the correct chat
+      // Try multiple queries to find the user's chat
+      let chat = await Chat.findOne({
+        participants: req.user._id,
+        chatType: 'support'
+      }).populate('participants', 'fullName email role');
+
+      // If not found, try finding by user ID in participants array (more reliable)
+      if (!chat) {
+        chat = await Chat.findOne({
+          'participants': { $in: [req.user._id] },
+          chatType: 'support'
+        }).populate('participants', 'fullName email role');
+      }
+
+      // If still not found, try to find any chat where user is a participant
+      if (!chat) {
+        const allChats = await Chat.find({
+          chatType: 'support'
+        }).populate('participants', 'fullName email role');
+        
+        chat = allChats.find(c => 
+          c.participants.some(p => p._id.toString() === req.user._id.toString())
+        );
+      }
+
+      if (!chat) {
+        // Only create new chat if absolutely no chat exists for this user
+        const admin = await User.findOne({ 
+          role: { $in: ['admin', 'super_admin'] }, 
+          isActive: true 
+        }).sort({ createdAt: 1 }); // Get first admin
+        
+        const participants = [req.user._id];
+        if (admin) participants.push(admin._id);
+
+        chat = new Chat({
+          participants,
+          chatType: 'support',
+          title: `Support Chat - ${req.user.fullName}`,
+          status: 'open',
+          priority: 'medium',
+          messages: []
+        });
+
+        await chat.save();
+        await chat.populate('participants', 'fullName email role');
+        console.log(`✅ Created new support chat ${chat._id} for user ${req.user._id}`);
+      } else {
+        console.log(`✅ Found existing chat ${chat._id} with ${chat.messages.length} messages for user ${req.user._id}`);
+      }
+
+      // Ensure user is in participants (safety check)
+      const userIdStr = req.user._id.toString();
+      const isParticipant = chat.participants.some(p => p._id.toString() === userIdStr);
+      if (!isParticipant) {
+        chat.participants.push(req.user._id);
+        await chat.save();
+        await chat.populate('participants', 'fullName email role');
+        console.log(`➕ Added user ${req.user._id} to chat ${chat._id} participants`);
+      }
+
+      // Format messages for frontend with proper sender info - Include fileSize
+      // Sort messages by timestamp to ensure correct order
+      const sortedMessages = [...chat.messages].sort((a, b) => 
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+
+      const messages = sortedMessages.map(msg => {
+        const sender = chat.participants.find(p => p._id.toString() === msg.sender?.toString());
+        
+        return {
+          id: msg._id.toString(),
+          senderId: msg.sender?.toString() || req.user._id.toString(),
+          senderName: sender?.fullName || (msg.sender?.toString() === req.user._id.toString() ? req.user.fullName : 'Support'),
+          senderRole: sender?.role || (msg.sender?.toString() === req.user._id.toString() ? req.user.role : 'admin'),
+          content: msg.text || '',
+          type: msg.type || 'text',
+          fileUrl: msg.fileUrl,
+          fileName: msg.fileName,
+          fileSize: msg.fileSize,
+          timestamp: msg.createdAt,
+          status: msg.isRead ? 'read' : 'delivered'
+        };
+      });
+
+      console.log(`📨 Returning ${messages.length} messages for user ${req.user._id} from chat ${chat._id}`);
+
+      res.json({
+        messages,
+        chatId: chat._id.toString()
+      });
     }
-
-    // Format messages for frontend
-    const messages = chat.messages.map(msg => ({
-      id: msg._id.toString(),
-      senderId: msg.sender?.toString() || req.user._id.toString(),
-      senderName: msg.sender?.toString() === req.user._id.toString() ? req.user.fullName : 'Support',
-      senderRole: msg.sender?.toString() === req.user._id.toString() ? req.user.role : 'admin',
-      content: msg.text || '',
-      type: msg.type || 'text',
-      fileUrl: msg.fileUrl,
-      fileName: msg.fileName,
-      timestamp: msg.createdAt,
-      status: msg.isRead ? 'read' : 'delivered'
-    }));
-
-    res.json({
-      messages,
-      chatId: chat._id
-    });
 
   } catch (error) {
     console.error('Get messages error:', error);
@@ -447,12 +537,14 @@ router.post('/:chatId/messages', authenticateToken, validateChatMessage, async (
 
     // Create message
     const message = {
+      sender: req.user._id,
       type,
       text: text?.trim(),
       fileUrl,
       fileName,
       fileSize,
-      createdAt: new Date()
+      createdAt: new Date(),
+      isRead: false
     };
 
     chat.messages.push(message);
@@ -466,6 +558,20 @@ router.post('/:chatId/messages', authenticateToken, validateChatMessage, async (
 
     // Get the created message with populated data
     const createdMessage = chat.messages[chat.messages.length - 1];
+
+    // Create notifications for message
+    try {
+      const sender = await User.findById(req.user._id).select('fullName email role');
+      if (sender) {
+        await chat.populate('participants', 'fullName email role');
+        const io = req.app.get('io');
+        const notifications = await createMessageNotification(chat, createdMessage, sender, io);
+        console.log(`📧 Created ${notifications.length} notification(s) for HTTP message`);
+      }
+    } catch (notifError) {
+      console.error('Failed to create message notification:', notifError);
+      console.error('Notification error details:', notifError.stack);
+    }
 
     res.status(201).json({
       message: 'Message sent successfully',
@@ -672,17 +778,36 @@ router.post('/messages', authenticateToken, requireApproval, upload.single('file
     const { content, type = 'text' } = req.body;
     const file = req.file;
 
-    // Find user's support chat
+    // Find user's support chat - Enhanced to ensure chat exists
     let chat = await Chat.findOne({
       participants: req.user._id,
       chatType: 'support'
     });
 
     if (!chat) {
-      return res.status(404).json({ message: 'Chat not found. Please refresh and try again.' });
+      // Create chat if it doesn't exist (safety net)
+      const admin = await User.findOne({ 
+        role: { $in: ['admin', 'super_admin'] }, 
+        isActive: true 
+      }).sort({ createdAt: 1 });
+      
+      const participants = [req.user._id];
+      if (admin) participants.push(admin._id);
+      
+      chat = new Chat({
+        participants,
+        chatType: 'support',
+        title: `Support Chat - ${req.user.fullName}`,
+        status: 'open',
+        priority: 'medium',
+        messages: []
+      });
+      
+      await chat.save();
+      console.log(`✅ Created missing chat ${chat._id} for user ${req.user._id}`);
     }
 
-    // Create message object
+    // Create message object - Include all fields
     const messageData = {
       sender: req.user._id,
       type: type,
@@ -691,7 +816,7 @@ router.post('/messages', authenticateToken, requireApproval, upload.single('file
       isRead: false
     };
 
-    // Handle file upload
+    // Handle file upload - Include fileSize
     if (file) {
       messageData.fileUrl = `/uploads/chat/${file.filename}`;
       messageData.fileName = file.originalname;
@@ -714,12 +839,14 @@ router.post('/messages', authenticateToken, requireApproval, upload.single('file
       chat.status = 'open';
     }
 
+    // Save to database - CRITICAL: Ensure message is persisted
     await chat.save();
+    console.log(`💾 Saved HTTP message to chat ${chat._id}`);
 
     // Get the created message
     const createdMessage = chat.messages[chat.messages.length - 1];
     
-    // Transform message to match frontend expectations
+    // Transform message to match frontend expectations - Include fileSize
     const message = {
       id: createdMessage._id.toString(),
       senderId: req.user._id.toString(),
@@ -729,6 +856,7 @@ router.post('/messages', authenticateToken, requireApproval, upload.single('file
       type: createdMessage.type || 'text',
       fileUrl: createdMessage.fileUrl,
       fileName: createdMessage.fileName,
+      fileSize: createdMessage.fileSize,
       timestamp: createdMessage.createdAt.toISOString(),
       status: 'sent'
     };

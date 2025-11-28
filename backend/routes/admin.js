@@ -3,6 +3,7 @@ const AdminSettings = require('../models/AdminSettings');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const { createAccountApprovalNotification } = require('../utils/notifications');
 const { authenticateToken, requireRole, sensitiveOperation } = require('../middleware/auth');
 const { validateAdminSettings, validatePagination } = require('../middleware/validation');
 
@@ -283,6 +284,10 @@ router.put('/users/:userId/approve', authenticateToken, requireRole(['admin', 's
 
     user.approved = approved;
     await user.save();
+
+    // Create notification for account approval/rejection
+    const io = req.app.get('io');
+    await createAccountApprovalNotification(user, approved, io);
 
     res.json({
       message: `User ${approved ? 'approved' : 'disapproved'} successfully`,

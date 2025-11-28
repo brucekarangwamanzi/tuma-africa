@@ -88,13 +88,24 @@ const chatSchema = new mongoose.Schema({
 chatSchema.pre('save', function(next) {
   if (this.messages && this.messages.length > 0) {
     const lastMsg = this.messages[this.messages.length - 1];
-    this.lastMessage = {
-      text: lastMsg.text || 'File attachment',
-      createdAt: lastMsg.createdAt,
-      sender: this.participants.find(p => p.toString() !== this.lastMessage?.sender?.toString()) || this.participants[0]
-    };
+    // Ensure lastMessage is properly set
+    if (lastMsg && lastMsg.createdAt) {
+      this.lastMessage = {
+        text: lastMsg.text || (lastMsg.fileName ? `Sent a file: ${lastMsg.fileName}` : 'File attachment'),
+        createdAt: lastMsg.createdAt,
+        sender: lastMsg.sender || this.participants[0]
+      };
+    }
   }
   next();
+});
+
+// Post-save hook to ensure messages are persisted
+chatSchema.post('save', function(doc) {
+  // Verify messages were saved
+  if (doc.messages && doc.messages.length > 0) {
+    console.log(`✅ Chat ${doc._id} saved with ${doc.messages.length} message(s)`);
+  }
 });
 
 // Indexes for better performance

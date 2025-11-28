@@ -1,170 +1,233 @@
 #!/bin/bash
 
-# Tuma-Africa Link Cargo Deployment Script
-# This script automates the deployment process for production
+echo "🚀 Tuma Africa Cargo - Deployment Script"
+echo "=========================================="
 
-set -e  # Exit on any error
-
-echo "🚀 Starting Tuma-Africa Link Cargo Deployment..."
-
-# Colors for output
-RED='\033[0;31m'
+# Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Function to print colored output
-print_status() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
 print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo -e "${GREEN}✓ $1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "${YELLOW}⚠ $1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}✗ $1${NC}"
 }
 
-# Check if .env file exists
-if [ ! -f ".env" ]; then
-    print_error ".env file not found!"
-    print_warning "Please copy .env.example to .env and configure your environment variables"
+print_info() {
+    echo -e "${BLUE}ℹ $1${NC}"
+}
+
+# Check if git is installed
+if ! command -v git &> /dev/null; then
+    print_error "Git is not installed. Please install git first."
     exit 1
 fi
 
-# Check if Node.js is installed
+print_success "Git is installed"
+
+# Check if node is installed
 if ! command -v node &> /dev/null; then
-    print_error "Node.js is not installed!"
-    print_warning "Please install Node.js version 16 or higher"
+    print_error "Node.js is not installed. Please install Node.js first."
     exit 1
 fi
 
-# Check Node.js version
-NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 16 ]; then
-    print_error "Node.js version 16 or higher is required!"
-    print_warning "Current version: $(node -v)"
+print_success "Node.js is installed ($(node --version))"
+
+# Check if npm is installed
+if ! command -v npm &> /dev/null; then
+    print_error "npm is not installed. Please install npm first."
     exit 1
 fi
 
-print_success "Node.js version check passed: $(node -v)"
+print_success "npm is installed ($(npm --version))"
 
-# Check if MongoDB is running (optional check)
-if command -v mongosh &> /dev/null; then
-    if mongosh --eval "db.runCommand('ping').ok" --quiet > /dev/null 2>&1; then
-        print_success "MongoDB connection verified"
-    else
-        print_warning "MongoDB connection failed - make sure MongoDB is running"
-    fi
-fi
+echo ""
+echo "Select deployment option:"
+echo "1) Deploy to VPS with PM2 (Full Control)"
+echo "2) Build for Production (Local)"
+echo "3) Setup Ngrok (Quick Public URL)"
+echo "4) Deploy to Render (Cloud - Manual)"
+echo "5) Exit"
+echo ""
+read -p "Enter your choice (1-5): " choice
 
-# Install dependencies
-print_status "Installing dependencies..."
-npm run install-all
+case $choice in
+    1)
+        echo ""
+        print_info "📦 Deploying to VPS with PM2..."
+        
+        # Check if PM2 is installed
+        if ! command -v pm2 &> /dev/null; then
+            print_warning "PM2 is not installed globally"
+            print_info "Installing PM2..."
+            npm install -g pm2
+        fi
 
-if [ $? -eq 0 ]; then
-    print_success "Dependencies installed successfully"
-else
-    print_error "Failed to install dependencies"
-    exit 1
-fi
+        # Install dependencies
+        print_info "Installing dependencies..."
+        npm install
+        cd backend && npm install && cd ..
+        cd frontend && npm install && cd ..
 
-# Build frontend
-print_status "Building frontend for production..."
-cd frontend
-npm run build
+        # Build frontend
+        print_info "Building frontend for production..."
+        cd frontend
+        npm run build
+        cd ..
 
-if [ $? -eq 0 ]; then
-    print_success "Frontend build completed"
-    cd ..
-else
-    print_error "Frontend build failed"
-    exit 1
-fi
-
-# Check if PM2 is installed
-if ! command -v pm2 &> /dev/null; then
-    print_warning "PM2 is not installed globally"
-    print_status "Installing PM2..."
-    npm install -g pm2
-fi
-
-# Create PM2 ecosystem file
-print_status "Creating PM2 ecosystem configuration..."
-cat > ecosystem.config.js << EOF
+        # Create PM2 ecosystem file
+        print_info "Creating PM2 ecosystem configuration..."
+        cat > ecosystem.config.js << 'EOF'
 module.exports = {
   apps: [{
-    name: 'tuma-africa-cargo',
+    name: 'tuma-africa-backend',
     script: './backend/server.js',
-    instances: 'max',
-    exec_mode: 'cluster',
+    instances: 1,
+    exec_mode: 'fork',
     env: {
-      NODE_ENV: 'development',
-      PORT: 5000
-    },
-    env_production: {
       NODE_ENV: 'production',
-      PORT: 5000
+      PORT: 5001
     },
-    error_file: './logs/err.log',
-    out_file: './logs/out.log',
-    log_file: './logs/combined.log',
+    error_file: './logs/backend-err.log',
+    out_file: './logs/backend-out.log',
     time: true,
-    max_memory_restart: '1G',
-    node_args: '--max_old_space_size=1024'
+    max_memory_restart: '500M'
   }]
 };
 EOF
 
-# Create logs directory
-mkdir -p logs
+        # Create logs directory
+        mkdir -p logs
 
-# Stop existing PM2 process if running
-print_status "Stopping existing PM2 processes..."
-pm2 stop tuma-africa-cargo 2>/dev/null || true
-pm2 delete tuma-africa-cargo 2>/dev/null || true
+        # Stop existing PM2 processes
+        print_info "Stopping existing PM2 processes..."
+        pm2 stop all 2>/dev/null || true
+        pm2 delete all 2>/dev/null || true
 
-# Start application with PM2
-print_status "Starting application with PM2..."
-pm2 start ecosystem.config.js --env production
+        # Start application with PM2
+        print_info "Starting application with PM2..."
+        pm2 start ecosystem.config.js
 
-if [ $? -eq 0 ]; then
-    print_success "Application started successfully with PM2"
-else
-    print_error "Failed to start application with PM2"
-    exit 1
-fi
+        # Save PM2 configuration
+        pm2 save
 
-# Save PM2 configuration
-pm2 save
+        # Setup PM2 startup script
+        print_info "Setting up PM2 startup script..."
+        pm2 startup
 
-# Setup PM2 startup script
-print_status "Setting up PM2 startup script..."
-pm2 startup
+        print_success "🎉 Deployment completed successfully!"
+        echo ""
+        print_info "Application Status:"
+        pm2 status
+        echo ""
+        print_info "Useful Commands:"
+        echo "  pm2 status              - Check status"
+        echo "  pm2 logs                - View logs"
+        echo "  pm2 restart all         - Restart app"
+        echo "  pm2 monit               - Monitor resources"
+        echo ""
+        print_info "Access your app:"
+        echo "  Local: http://localhost:5001"
+        echo "  Network: http://$(hostname -I | awk '{print $1}'):5001"
+        ;;
 
-print_success "🎉 Deployment completed successfully!"
-print_status "Application is running on port 5000"
-print_status "You can monitor the application with: pm2 monit"
-print_status "View logs with: pm2 logs tuma-africa-cargo"
-print_status "Restart application with: pm2 restart tuma-africa-cargo"
+    2)
+        echo ""
+        print_info "📦 Building for production..."
+        
+        # Install dependencies
+        print_info "Installing dependencies..."
+        npm install
+        cd backend && npm install && cd ..
+        cd frontend && npm install && cd ..
 
-# Display application status
-echo ""
-print_status "Application Status:"
-pm2 status
+        # Build frontend
+        print_info "Building frontend..."
+        cd frontend
+        npm run build
+        cd ..
 
-echo ""
-print_status "Next Steps:"
-echo "1. Configure Nginx reverse proxy (see README.md)"
-echo "2. Set up SSL certificate with Let's Encrypt"
-echo "3. Configure your domain DNS settings"
-echo "4. Test the application at http://your-server-ip:5000"
+        print_success "Build completed!"
+        print_info "Frontend build is in: frontend/build"
+        print_info "To serve: cd frontend/build && npx serve -s ."
+        ;;
+
+    3)
+        echo ""
+        print_info "🌐 Setting up Ngrok..."
+        
+        # Check if ngrok is installed
+        if ! command -v ngrok &> /dev/null; then
+            print_warning "Ngrok is not installed"
+            print_info "Installing ngrok..."
+            npm install -g ngrok
+        fi
+
+        print_info "Starting servers..."
+        
+        # Start backend in background
+        cd backend
+        npm start &
+        BACKEND_PID=$!
+        cd ..
+
+        sleep 3
+
+        # Start ngrok
+        print_success "Backend started!"
+        print_info "Starting ngrok tunnel..."
+        print_info "Your public URL will appear below:"
+        echo ""
+        ngrok http 5001
+
+        # Cleanup on exit
+        kill $BACKEND_PID 2>/dev/null
+        ;;
+
+    4)
+        echo ""
+        print_info "📋 Render Deployment Instructions"
+        echo ""
+        echo "1. Push your code to GitHub"
+        echo "2. Go to https://render.com and sign up"
+        echo "3. Click 'New +' → 'Web Service'"
+        echo "4. Connect your GitHub repository"
+        echo "5. Configure:"
+        echo "   - Name: tuma-africa-cargo"
+        echo "   - Environment: Node"
+        echo "   - Build Command: cd backend && npm install"
+        echo "   - Start Command: cd backend && node server.js"
+        echo "6. Add Environment Variables:"
+        echo "   - NODE_ENV=production"
+        echo "   - PORT=5001"
+        echo "   - MONGODB_URI=your_mongodb_uri"
+        echo "   - JWT_SECRET=your_secret"
+        echo "7. Click 'Create Web Service'"
+        echo ""
+        print_info "For detailed instructions, see DEPLOYMENT_OPTIONS.md"
+        ;;
+
+    5)
+        echo ""
+        print_info "Exiting..."
+        exit 0
+        ;;
+
+    *)
+        print_error "Invalid choice"
+        exit 1
+        ;;
+esac
 
 echo ""
 print_success "Deployment script completed! 🚀"

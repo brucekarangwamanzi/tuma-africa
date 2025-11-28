@@ -5,6 +5,8 @@ import { toast } from 'react-toastify';
 import axios from 'axios';
 import { useSettingsStore, AdminSettings } from '../../store/settingsStore';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import ProductsSectionManager from '../../components/admin/ProductsSectionManager';
+import ProductManagementCMS from '../../components/admin/ProductManagementCMS';
 
 const SuperAdminCMS: React.FC = () => {
   const { settings, updateSettings, isUpdating } = useSettingsStore();
@@ -86,6 +88,7 @@ const SuperAdminCMS: React.FC = () => {
     { id: 'hero', label: 'Hero Section', icon: Image },
     { id: 'advertisements', label: 'Advertisements', icon: Settings },
     { id: 'products', label: 'Products Section', icon: Settings },
+    { id: 'product-management', label: 'Product Management', icon: Plus },
     { id: 'theme', label: 'Theme & Colors', icon: Palette },
     { id: 'company', label: 'Company Info', icon: Type },
     { id: 'social', label: 'Social Links', icon: Settings },
@@ -478,68 +481,16 @@ const SuperAdminCMS: React.FC = () => {
 
               {/* Products Section */}
               {activeTab === 'products' && (
-                <div className="bg-white rounded-lg shadow-soft p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Products Section</h2>
-                  
-                  <div className="space-y-6">
-                    <div>
-                      <label className="label">Section Title</label>
-                      <input
-                        type="text"
-                        {...register('productSection.title')}
-                        className="input"
-                        placeholder="Shop Popular Products"
-                      />
-                    </div>
+                <ProductsSectionManager 
+                  register={register}
+                  setValue={setValue}
+                  watchedValues={watchedValues}
+                />
+              )}
 
-                    <div>
-                      <label className="label">Section Subtitle</label>
-                      <textarea
-                        {...register('productSection.subtitle')}
-                        className="input"
-                        rows={3}
-                        placeholder="Order from a selection of our most popular and frequently purchased items."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="label">Display Count</label>
-                      <input
-                        type="number"
-                        {...register('productSection.displayCount')}
-                        className="input"
-                        min="4"
-                        max="20"
-                        placeholder="8"
-                      />
-                      <p className="text-sm text-gray-600 mt-1">
-                        Number of products to display on the homepage
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          {...register('productSection.showPrices')}
-                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">Show product pricing</span>
-                      </label>
-                    </div>
-
-                    <div>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          {...register('productSection.showRatings')}
-                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">Show product ratings</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
+              {/* Product Management Section */}
+              {activeTab === 'product-management' && (
+                <ProductManagementCMS />
               )}
 
               {/* Company Info Section */}
@@ -770,7 +721,9 @@ const SuperAdminCMS: React.FC = () => {
                     {/* Color Preview */}
                     <div className="border-t pt-6">
                       <h3 className="text-lg font-medium text-gray-900 mb-4">Color Preview</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      
+                      {/* Color Swatches */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         <div className="text-center">
                           <div 
                             className="w-full h-24 rounded-lg shadow-md mb-2"
@@ -810,6 +763,102 @@ const SuperAdminCMS: React.FC = () => {
                           <p className="text-xs text-gray-500 font-mono">
                             {watchedValues.theme?.backgroundColor || '#ffffff'}
                           </p>
+                        </div>
+                      </div>
+
+                      {/* Live Component Preview */}
+                      <div className="bg-gray-50 p-6 rounded-lg">
+                        <h4 className="text-md font-medium text-gray-900 mb-4">Live Component Preview</h4>
+                        <div className="space-y-4">
+                          
+                          {/* Buttons */}
+                          <div className="flex flex-wrap gap-3">
+                            <button 
+                              className="px-4 py-2 rounded-lg font-medium text-white transition-colors"
+                              style={{ backgroundColor: watchedValues.theme?.primaryColor || '#3b82f6' }}
+                            >
+                              Primary Button
+                            </button>
+                            <button 
+                              className="px-4 py-2 rounded-lg font-medium text-white transition-colors"
+                              style={{ backgroundColor: watchedValues.theme?.secondaryColor || '#64748b' }}
+                            >
+                              Secondary Button
+                            </button>
+                            <button 
+                              className="px-4 py-2 rounded-lg font-medium text-white transition-colors"
+                              style={{ backgroundColor: watchedValues.theme?.accentColor || '#f59e0b' }}
+                            >
+                              Accent Button
+                            </button>
+                          </div>
+
+                          {/* Navigation Example */}
+                          <div className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="flex space-x-6">
+                              <a 
+                                href="#" 
+                                className="font-medium border-b-2 pb-2"
+                                style={{ 
+                                  color: watchedValues.theme?.primaryColor || '#3b82f6',
+                                  borderColor: watchedValues.theme?.primaryColor || '#3b82f6'
+                                }}
+                              >
+                                Active Tab
+                              </a>
+                              <a href="#" className="font-medium text-gray-500 pb-2">Inactive Tab</a>
+                              <a href="#" className="font-medium text-gray-500 pb-2">Another Tab</a>
+                            </div>
+                          </div>
+
+                          {/* Card Example */}
+                          <div className="bg-white rounded-lg p-4 border border-gray-200">
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="font-semibold text-gray-900">Sample Product Card</h5>
+                              <span 
+                                className="px-2 py-1 text-xs font-medium rounded-full text-white"
+                                style={{ backgroundColor: watchedValues.theme?.accentColor || '#f59e0b' }}
+                              >
+                                New
+                              </span>
+                            </div>
+                            <p className="text-gray-600 text-sm mb-3">This is how your product cards will look with the selected theme colors.</p>
+                            <div className="flex items-center justify-between">
+                              <span 
+                                className="text-lg font-bold"
+                                style={{ color: watchedValues.theme?.primaryColor || '#3b82f6' }}
+                              >
+                                $29.99
+                              </span>
+                              <button 
+                                className="px-3 py-1 text-sm font-medium text-white rounded-md"
+                                style={{ backgroundColor: watchedValues.theme?.primaryColor || '#3b82f6' }}
+                              >
+                                Add to Cart
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Message Bubble Example */}
+                          <div className="bg-white rounded-lg p-4 border border-gray-200">
+                            <h5 className="font-semibold text-gray-900 mb-3">Chat Interface Preview</h5>
+                            <div className="space-y-2">
+                              <div className="flex justify-end">
+                                <div 
+                                  className="px-3 py-2 rounded-lg text-sm max-w-xs"
+                                  style={{ backgroundColor: `${watchedValues.theme?.primaryColor || '#3b82f6'}20` }}
+                                >
+                                  This is how sent messages will appear
+                                </div>
+                              </div>
+                              <div className="flex justify-start">
+                                <div className="bg-white border px-3 py-2 rounded-lg text-sm max-w-xs">
+                                  And this is how received messages look
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
                         </div>
                       </div>
                     </div>

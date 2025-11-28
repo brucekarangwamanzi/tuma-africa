@@ -7,6 +7,11 @@ class WebSocketService {
   private userId: string | null = null;
 
   connect(userId: string) {
+    // Don't reconnect if already connected with same user
+    if (this.socket?.connected && this.userId === userId) {
+      return this.socket;
+    }
+
     this.userId = userId;
 
     // Disconnect existing socket if any
@@ -33,47 +38,97 @@ class WebSocketService {
       return null;
     }
 
-    console.log('Connecting to WebSocket with token...');
+    // Determine WebSocket URL based on environment
+    const wsUrl = process.env.REACT_APP_WS_URL || 
+                  (window.location.hostname === 'localhost' 
+                    ? 'http://localhost:5001' 
+                    : process.env.NODE_ENV === 'production'
+                      ? `https://${process.env.REACT_APP_API_URL?.replace('/api', '') || window.location.hostname}`
+                      : `http://${window.location.hostname}:5001`);
 
-    this.socket = io(process.env.REACT_APP_WS_URL || 'http://localhost:5001', {
+    // Only log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔌 Connecting to WebSocket:', wsUrl);
+    }
+
+    this.socket = io(wsUrl, {
       auth: {
         token
       },
       transports: ['websocket', 'polling'],
-      reconnection: false, // We'll handle reconnection manually
-      autoConnect: true
+      reconnection: true,
+      reconnectionDelay: 2000, // Increased from 1s to 2s
+      reconnectionDelayMax: 10000, // Increased from 5s to 10s
+      reconnectionAttempts: 3, // Reduced from 5 to 3
+      autoConnect: true,
+      timeout: 15000 // Increased from 10s to 15s
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ WebSocket connected successfully');
+      // Only log in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ WebSocket connected');
+      }
       this.reconnectAttempts = 0;
       this.socket?.emit('user:online', { userId });
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('WebSocket disconnected:', reason);
+      // Only log important disconnects
       if (reason === 'io server disconnect') {
-        // Server disconnected us, likely auth issue
-        console.error('Server disconnected the socket - possible auth issue');
+        console.error('❌ Server disconnected - possible auth issue');
       }
+      // Don't log normal disconnects to reduce noise
     });
 
     this.socket.on('connect_error', (error: Error) => {
-      console.error('WebSocket connection error:', error.message);
-      
-      // If authentication error, don't retry
-      if (error.message.includes('Authentication')) {
-        console.error('❌ Authentication failed. Token may be expired.');
-        this.disconnect();
-        // Don't auto-redirect, let the app handle it
+      // Only log authentication errors, not every connection attempt
+      if (error.message.includes('Authentication') || error.message.includes('401') || error.message.includes('403')) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ WebSocket auth error - token may be expired');
+        }
+        // Don't disconnect immediately, let it retry with a new token
+        setTimeout(() => {
+          if (!this.socket?.connected) {
+            this.disconnect();
+          }
+        }, 5000);
         return;
       }
-      
-      this.handleReconnect();
+      // Silently handle other connection errors (they will retry)
+    });
+
+    this.socket.on('reconnect', (attemptNumber) => {
+      // Only log successful reconnections
+      if (process.env.NODE_ENV === 'development' && attemptNumber > 1) {
+        console.log(`✅ WebSocket reconnected after ${attemptNumber} attempts`);
+      }
+    });
+
+    // Don't log every reconnection attempt - too noisy
+    this.socket.on('reconnect_attempt', () => {
+      // Silently retry
+    });
+
+    this.socket.on('reconnect_error', () => {
+      // Silently handle reconnection errors
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('❌ Failed to reconnect after maximum attempts');
     });
 
     this.socket.on('error', (error: any) => {
-      console.error('WebSocket error:', error);
+      // Only log critical errors
+      if (error.message && !error.message.includes('websocket')) {
+        console.error('❌ WebSocket error:', error);
+      }
+    });
+
+    // Listen for user status updates - Remove excessive logging
+    this.socket.on('user:status', () => {
+      // Don't log every status update - too noisy
+      // Status updates are handled by components that need them
     });
 
     return this.socket;
@@ -136,7 +191,15 @@ class WebSocketService {
 
   // Notification events
   onNotification(callback: (notification: any) => void) {
-    this.socket?.on('notification', callback);
+    this.socket?.on('notification:new', callback);
+  }
+
+  offNotification(callback?: (notification: any) => void) {
+    if (callback) {
+      this.socket?.off('notification:new', callback);
+    } else {
+      this.socket?.off('notification:new');
+    }
   }
 
   // Video call events

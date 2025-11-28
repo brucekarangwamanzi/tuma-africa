@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Package, 
   ArrowLeft, 
   Plus, 
   Minus,
   DollarSign,
-  Truck,
+  Ship,
+  Plane,
   AlertCircle,
   CheckCircle,
   Link as LinkIcon,
   FileText
 } from 'lucide-react';
+import axios from 'axios';
 import { useOrderStore } from '../store/orderStore';
 
 interface OrderFormData {
@@ -19,23 +21,64 @@ interface OrderFormData {
   productLink: string;
   quantity: number;
   unitPrice: number;
-  shippingCost: number;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  freightType: 'sea' | 'air';
   description: string;
 }
 
 const NewOrderPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { createOrder, isSubmitting } = useOrderStore();
   const [formData, setFormData] = useState<OrderFormData>({
-    productName: '',
-    productLink: '',
-    quantity: 1,
-    unitPrice: 0,
-    shippingCost: 0,
-    priority: 'normal',
+    productName: searchParams.get('product') || '',
+    productLink: searchParams.get('link') || '',
+    quantity: parseInt(searchParams.get('quantity') || '1') || 1,
+    unitPrice: parseFloat(searchParams.get('price') || '0') || 0,
+    freightType: 'sea',
     description: ''
   });
+
+  const isFromWebsite = searchParams.get('fromWebsite') === 'true';
+  const productId = searchParams.get('productId');
+
+  // Fetch product details if productId is provided
+  useEffect(() => {
+    const fetchProductDetails = async () => {
+      if (productId && isFromWebsite) {
+        try {
+          const response = await axios.get(`/products/${productId}`);
+          const product = response.data.product;
+          if (product) {
+            setFormData(prev => ({
+              ...prev,
+              productName: product.name || prev.productName,
+              unitPrice: product.price || prev.unitPrice,
+              description: product.description || prev.description
+            }));
+          }
+        } catch (error) {
+          console.error('Failed to fetch product details:', error);
+          // Don't show error to user - URL params will be used as fallback
+        }
+      }
+    };
+
+    fetchProductDetails();
+  }, [productId, isFromWebsite]);
+
+  // Update form data when URL params change
+  useEffect(() => {
+    const product = searchParams.get('product');
+    const link = searchParams.get('link');
+    const price = searchParams.get('price');
+    const quantity = searchParams.get('quantity');
+    const fromWebsite = searchParams.get('fromWebsite') === 'true';
+
+    if (product) setFormData(prev => ({ ...prev, productName: product }));
+    if (link && !fromWebsite) setFormData(prev => ({ ...prev, productLink: link }));
+    if (price) setFormData(prev => ({ ...prev, unitPrice: parseFloat(price) || 0 }));
+    if (quantity) setFormData(prev => ({ ...prev, quantity: parseInt(quantity) || 1 }));
+  }, [searchParams]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -53,30 +96,25 @@ const NewOrderPage: React.FC = () => {
   };
 
   const calculateTotal = () => {
-    const subtotal = formData.quantity * formData.unitPrice;
-    return subtotal + formData.shippingCost;
+    return formData.quantity * formData.unitPrice;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      await createOrder(formData);
+      // If ordering from website product, don't include productLink
+      const orderData = isFromWebsite 
+        ? { ...formData, productLink: '' }
+        : formData;
+      
+      await createOrder(orderData);
       navigate('/orders');
     } catch (error) {
       // Error handling is done in the store
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    const colors = {
-      low: 'text-gray-600 bg-gray-100',
-      normal: 'text-blue-600 bg-blue-100',
-      high: 'text-orange-600 bg-orange-100',
-      urgent: 'text-red-600 bg-red-100'
-    };
-    return colors[priority as keyof typeof colors] || colors.normal;
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -131,22 +169,24 @@ const NewOrderPage: React.FC = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Product Link
-                    </label>
-                    <div className="relative">
-                      <LinkIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="url"
-                        name="productLink"
-                        value={formData.productLink}
-                        onChange={handleInputChange}
-                        placeholder="https://example.com/product"
-                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
+                  {!isFromWebsite && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Product Link
+                      </label>
+                      <div className="relative">
+                        <LinkIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                          type="url"
+                          name="productLink"
+                          value={formData.productLink}
+                          onChange={handleInputChange}
+                          placeholder="https://example.com/product"
+                          className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -176,90 +216,101 @@ const NewOrderPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
                       Quantity *
                     </label>
                     <div className="flex items-center space-x-3">
-                      <button
-                        type="button"
-                        onClick={() => handleQuantityChange(-1)}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                        disabled={formData.quantity <= 1}
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
+                      {/* Vertical quantity controls */}
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(1)}
+                          className="flex items-center justify-center w-10 h-10 rounded-t-lg border-2 border-b-0 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-primary-600 hover:text-primary-600 transition-all duration-200 touch-manipulation active:scale-95"
+                          aria-label="Increase quantity"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(-1)}
+                          className="flex items-center justify-center w-10 h-10 rounded-b-lg border-2 border-t-0 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-primary-600 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 touch-manipulation active:scale-95"
+                          disabled={formData.quantity <= 1}
+                          aria-label="Decrease quantity"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                      </div>
                       <input
                         type="number"
                         name="quantity"
                         value={formData.quantity}
                         onChange={handleInputChange}
                         min="1"
-                        className="w-20 px-3 py-2 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="flex-1 px-4 py-3 text-center text-lg font-semibold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
                       />
-                      <button
-                        type="button"
-                        onClick={() => handleQuantityChange(1)}
-                        className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
                     </div>
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      {formData.quantity} {formData.quantity === 1 ? 'item' : 'items'} selected
+                    </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
                       Unit Price *
                     </label>
                     <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-700 font-medium text-lg">
+                        $
+                      </span>
                       <input
                         type="number"
                         name="unitPrice"
-                        value={formData.unitPrice}
+                        value={formData.unitPrice || ''}
                         onChange={handleInputChange}
-                        placeholder="0.00"
+                        placeholder="0"
                         step="0.01"
                         min="0"
-                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full pl-8 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all text-lg font-semibold"
                         required
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Shipping Cost
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Freight Type *
                     </label>
-                    <div className="relative">
-                      <Truck className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="number"
-                        name="shippingCost"
-                        value={formData.shippingCost}
-                        onChange={handleInputChange}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                        className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, freightType: 'sea' }))}
+                        className={`flex items-center justify-center space-x-3 px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                          formData.freightType === 'sea'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700'
+                            : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                        }`}
+                      >
+                        <Ship className="w-5 h-5" />
+                        <span className="font-medium">Sea Freight</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, freightType: 'air' }))}
+                        className={`flex items-center justify-center space-x-3 px-4 py-3 rounded-lg border-2 transition-all duration-200 ${
+                          formData.freightType === 'air'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700'
+                            : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                        }`}
+                      >
+                        <Plane className="w-5 h-5" />
+                        <span className="font-medium">Air Freight</span>
+                      </button>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Priority
-                    </label>
-                    <select
-                      name="priority"
-                      value={formData.priority}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="low">Low Priority</option>
-                      <option value="normal">Normal Priority</option>
-                      <option value="high">High Priority</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {formData.freightType === 'sea' 
+                        ? 'Sea Freight: 30-45 days (Most economical)' 
+                        : 'Air Freight: 7-14 days (Faster delivery)'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -276,11 +327,6 @@ const NewOrderPage: React.FC = () => {
                     <span className="font-medium">${((formData.quantity || 0) * (formData.unitPrice || 0)).toLocaleString()}</span>
                   </div>
                   
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Shipping</span>
-                    <span className="font-medium">${(formData.shippingCost || 0).toLocaleString()}</span>
-                  </div>
-                  
                   <div className="border-t border-gray-200 pt-4">
                     <div className="flex justify-between">
                       <span className="text-lg font-semibold text-gray-900">Total</span>
@@ -289,12 +335,24 @@ const NewOrderPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-6">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <span className="text-sm text-gray-600">Priority:</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(formData.priority)}`}>
-                      {formData.priority.charAt(0).toUpperCase() + formData.priority.slice(1)}
-                    </span>
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center space-x-3">
+                    {formData.freightType === 'sea' ? (
+                      <Ship className="w-5 h-5 text-blue-600" />
+                    ) : (
+                      <Plane className="w-5 h-5 text-blue-600" />
+                    )}
+                    <div>
+                      <p className="text-sm text-blue-600 font-medium mb-1">Freight Type</p>
+                      <p className="text-base font-semibold text-gray-900">
+                        {formData.freightType === 'sea' ? 'Sea Freight' : 'Air Freight'}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {formData.freightType === 'sea' 
+                          ? 'Estimated: 30-45 days' 
+                          : 'Estimated: 7-14 days'}
+                      </p>
+                    </div>
                   </div>
                 </div>
 

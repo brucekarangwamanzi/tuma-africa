@@ -264,26 +264,93 @@ router.get('/dashboard-stats', authenticateToken, requireApproval, async (req, r
 });
 
 // @route   POST /api/users/verify-email
-// @desc    Request email verification
+// @desc    Request email verification (resend)
 // @access  Private
 router.post('/verify-email', authenticateToken, async (req, res) => {
   try {
-    if (req.user.verified) {
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.verified) {
       return res.status(400).json({ message: 'Email already verified' });
     }
 
-    // In production, send verification email
-    // For now, just return success message
-    
+    // Generate new verification token
+    const crypto = require('crypto');
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date();
+    verificationExpires.setHours(verificationExpires.getHours() + 24);
+
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = verificationExpires;
+    await user.save();
+
+    // Send verification email
+    const { sendVerificationEmail } = require('../utils/emailService');
+    const emailResult = await sendVerificationEmail(user.email, verificationToken, user.fullName);
+
+    if (!emailResult.success) {
+      // If email service is not configured, still allow the request but inform user
+      if (process.env.NODE_ENV === 'development' && emailResult.debug) {
+        console.log('📧 Development mode - Email not configured:', emailResult.debug);
+        return res.json({ 
+          message: 'Verification email would be sent. Email service not configured.',
+          debug: emailResult.debug,
+          verificationToken: verificationToken // Only in development
+        });
+      }
+      return res.status(500).json({ 
+        message: 'Failed to send verification email. Please contact support.',
+        error: emailResult.error
+      });
+    }
+
     res.json({ 
-      message: 'Verification email sent. Please check your inbox.',
-      // Remove this in production
-      debug: process.env.NODE_ENV === 'development' ? 'Email verification not implemented yet' : undefined
+      message: 'Verification email sent. Please check your inbox.'
     });
 
   } catch (error) {
     console.error('Email verification error:', error);
     res.status(500).json({ message: 'Failed to send verification email' });
+  }
+});
+
+// @route   GET /api/users/verify-email/:token
+// @desc    Verify email with token
+// @access  Public
+router.get('/verify-email/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: 'Invalid or expired verification token' 
+      });
+    }
+
+    // Verify the email
+    user.verified = true;
+    user.emailVerifiedAt = new Date();
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    res.json({ 
+      message: 'Email verified successfully!',
+      verified: true
+    });
+
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ message: 'Failed to verify email' });
   }
 });
 

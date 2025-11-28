@@ -107,6 +107,35 @@ router.get('/featured', async (req, res) => {
   }
 });
 
+// @route   POST /api/products/by-ids
+// @desc    Get products by array of IDs
+// @access  Public
+router.post('/by-ids', async (req, res) => {
+  try {
+    const { productIds } = req.body;
+    
+    if (!productIds || !Array.isArray(productIds)) {
+      return res.status(400).json({ message: 'Product IDs array is required' });
+    }
+
+    const products = await Product.find({
+      _id: { $in: productIds },
+      isActive: true
+    }).select('name description price originalPrice imageUrl category popularity');
+
+    // Sort products in the order of the provided IDs
+    const sortedProducts = productIds
+      .map(id => products.find(p => p._id.toString() === id))
+      .filter(Boolean);
+
+    res.json({ products: sortedProducts });
+
+  } catch (error) {
+    console.error('Get products by IDs error:', error);
+    res.status(500).json({ message: 'Failed to fetch products' });
+  }
+});
+
 // @route   GET /api/products/:id
 // @desc    Get single product
 // @access  Public

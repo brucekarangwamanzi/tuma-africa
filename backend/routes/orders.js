@@ -4,6 +4,7 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const { authenticateToken, requireRole, requireApproval } = require('../middleware/auth');
 const { validateOrderCreation, validateOrderUpdate, validatePagination } = require('../middleware/validation');
+const { createOrderNotification } = require('../utils/notifications');
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
       unitPrice,
       shippingCost = 0,
       priority = 'normal',
+      freightType = 'sea',
       description,
       totalPrice,
       finalAmount
@@ -34,6 +36,7 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
       shippingCost,
       finalAmount: finalAmount || ((quantity * unitPrice) + shippingCost),
       priority,
+      freightType,
       description,
       shippingAddress: {
         fullName: req.user.fullName,
@@ -54,6 +57,17 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
     await order.save();
     await order.populate('userId', 'fullName email phone');
 
+    // Create notification for order creation
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        await createOrderNotification(order, 'created', io);
+      }
+    } catch (notificationError) {
+      // Don't fail order creation if notification fails
+      console.error('Failed to create order notification:', notificationError);
+    }
+
     res.status(201).json({
       message: 'Order created successfully',
       order
@@ -61,9 +75,18 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
 
   } catch (error) {
     console.error('Create order error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      body: req.body
+    });
     res.status(500).json({ 
       message: 'Failed to create order',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        stack: error.stack
+      } : undefined
     });
   }
 });
@@ -222,6 +245,12 @@ router.put('/:orderId', authenticateToken, requireRole(['admin', 'super_admin'])
       { path: 'stageHistory.updatedBy', select: 'fullName' }
     ]);
 
+    // Create notification if status changed
+    if (updates.status && updates.status !== oldStatus) {
+      const io = req.app.get('io');
+      await createOrderNotification(order, 'status_changed', io);
+    }
+
     res.json({
       message: 'Order updated successfully',
       order
@@ -317,6 +346,11 @@ router.put('/:orderId/status', authenticateToken, requireRole(['admin', 'super_a
     });
 
     await order.save();
+    await order.populate('userId', 'fullName email phone');
+
+    // Create notification for status change
+    const io = req.app.get('io');
+    await createOrderNotification(order, 'status_changed', io);
 
     res.json({
       message: 'Order status updated successfully',
@@ -369,6 +403,11 @@ router.delete('/:orderId', authenticateToken, async (req, res) => {
         notes: 'Order cancelled by customer'
       });
       await order.save();
+      await order.populate('userId', 'fullName email phone');
+
+      // Create notification for cancellation
+      const io = req.app.get('io');
+      await createOrderNotification(order, 'cancelled', io);
       
       res.json({ message: 'Order cancelled successfully' });
     } else {

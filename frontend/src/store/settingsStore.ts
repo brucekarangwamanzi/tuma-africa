@@ -29,6 +29,8 @@ export interface ProductSection {
   layout: 'grid' | 'carousel' | 'masonry';
   showPrices: boolean;
   showRatings: boolean;
+  featuredProducts: string[]; // Array of product IDs to display
+  displayMode: 'auto' | 'manual'; // auto = popular products, manual = selected products
 }
 
 export interface Theme {
@@ -179,6 +181,8 @@ const defaultSettings: AdminSettings = {
     layout: 'grid',
     showPrices: true,
     showRatings: true,
+    featuredProducts: [],
+    displayMode: 'auto',
   },
   advertisements: [],
   theme: {

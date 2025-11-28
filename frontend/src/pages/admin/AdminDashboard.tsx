@@ -50,7 +50,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleRefresh = () => {
     fetchDashboardData();
-    toast.success('Dashboard data refreshed');
+    // Removed toast notification - refresh happens silently
   };
 
   if (isLoadingDashboard && !stats) {
@@ -108,7 +108,7 @@ const AdminDashboard: React.FC = () => {
             className="card hover:shadow-lg transition-shadow duration-200"
           >
             <div className="card-body flex items-center">
-              <Users className="w-8 h-8 text-blue-500 mr-3" />
+              <Users className="w-8 h-8 text-primary mr-3" />
               <div className="text-left">
                 <p className="font-medium text-gray-900">Manage Users</p>
                 <p className="text-sm text-gray-600">View and approve users</p>
@@ -151,8 +151,8 @@ const AdminDashboard: React.FC = () => {
           >
             <div className="card-body flex items-center justify-between">
               <div className="flex items-center">
-                <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="p-2 bg-primary-light rounded-lg mr-3">
+                  <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                 </div>
@@ -162,7 +162,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
+                <span className="px-3 py-1 badge-primary text-xs font-bold rounded-full">
                   New
                 </span>
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,7 +195,7 @@ const AdminDashboard: React.FC = () => {
                         onClick={() => setChartPeriod(period)}
                         className={`px-3 py-1 text-sm rounded-md transition-colors ${
                           chartPeriod === period
-                            ? 'bg-blue-500 text-white'
+                            ? 'btn-primary'
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                         }`}
                       >

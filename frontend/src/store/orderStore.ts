@@ -5,6 +5,12 @@ import { toast } from 'react-toastify';
 interface Order {
   _id: string;
   orderId: string;
+  userId?: {
+    _id?: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+  };
   productName: string;
   productLink: string;
   quantity: number;
@@ -14,6 +20,7 @@ interface Order {
   finalAmount: number;
   status: string;
   priority: string;
+  freightType?: 'sea' | 'air';
   description?: string;
   trackingInfo?: {
     trackingNumber?: string;
@@ -42,8 +49,7 @@ interface OrderFormData {
   productLink: string;
   quantity: number;
   unitPrice: number;
-  shippingCost: number;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  freightType: 'sea' | 'air';
   description: string;
 }
 
@@ -133,10 +139,18 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     set({ isSubmitting: true, error: null });
     
     try {
+      const subtotal = orderData.quantity * orderData.unitPrice;
       const payload = {
-        ...orderData,
-        totalPrice: orderData.quantity * orderData.unitPrice,
-        finalAmount: (orderData.quantity * orderData.unitPrice) + orderData.shippingCost
+        productName: orderData.productName,
+        productLink: orderData.productLink || '', // Empty string if not provided
+        quantity: orderData.quantity,
+        unitPrice: orderData.unitPrice,
+        freightType: orderData.freightType || 'sea',
+        description: orderData.description || '',
+        totalPrice: subtotal,
+        finalAmount: subtotal,
+        shippingCost: 0, // Shipping cost will be calculated later based on freight type
+        priority: 'normal' // Default priority
       };
 
       const response = await axios.post('/orders', payload);
@@ -153,12 +167,21 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       return newOrder;
     } catch (error: any) {
       console.error('Failed to create order:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to create order';
+      console.error('Error response:', error.response?.data);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to create order';
+      const errorDetails = error.response?.data?.details || error.response?.data?.errors;
+      
+      if (errorDetails) {
+        console.error('Error details:', errorDetails);
+        toast.error(`${errorMessage}: ${JSON.stringify(errorDetails)}`);
+      } else {
+        toast.error(errorMessage);
+      }
+      
       set({
         error: errorMessage,
         isSubmitting: false
       });
-      toast.error(errorMessage);
       throw error;
     }
   },

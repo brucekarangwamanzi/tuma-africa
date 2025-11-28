@@ -35,6 +35,7 @@ interface Order {
   finalAmount: number;
   status: string;
   priority: string;
+  freightType?: 'sea' | 'air';
   description?: string;
   trackingInfo?: {
     trackingNumber?: string;
@@ -62,6 +63,9 @@ const OrderDetailPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const { currentOrder: order, isLoading, fetchOrder, updateOrderStatus, isSubmitting } = useOrderStore();
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
 
   useEffect(() => {
     if (orderId) {
@@ -72,6 +76,108 @@ const OrderDetailPage: React.FC = () => {
   const handleStatusUpdate = async (newStatus: string) => {
     if (!order) return;
     await updateOrderStatus(order._id, newStatus);
+  };
+
+  const handleContactSupport = () => {
+    if (!order) return;
+    // Navigate to messages page with product link pre-filled
+    const productLink = order.productLink || '';
+    const messageText = productLink 
+      ? `Hi, I need support regarding my order ${order.orderId}.\n\nProduct Link: ${productLink}`
+      : `Hi, I need support regarding my order ${order.orderId}.`;
+    
+    navigate(`/messages?prefill=${encodeURIComponent(messageText)}`);
+  };
+
+  const handleDownloadInvoice = () => {
+    if (!order) return;
+    
+    // Create invoice HTML
+    const invoiceHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Invoice - ${order.orderId}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; }
+          .header { text-align: center; margin-bottom: 40px; }
+          .invoice-details { margin-bottom: 30px; }
+          .invoice-details table { width: 100%; border-collapse: collapse; }
+          .invoice-details td { padding: 8px; border-bottom: 1px solid #eee; }
+          .invoice-details td:first-child { font-weight: bold; width: 150px; }
+          .items-table { width: 100%; border-collapse: collapse; margin: 30px 0; }
+          .items-table th, .items-table td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+          .items-table th { background-color: #f5f5f5; font-weight: bold; }
+          .total-section { margin-top: 30px; text-align: right; }
+          .total-row { font-size: 18px; font-weight: bold; margin-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>INVOICE</h1>
+          <p>Order ID: ${order.orderId}</p>
+          <p>Date: ${new Date(order.createdAt).toLocaleDateString()}</p>
+        </div>
+        
+        <div class="invoice-details">
+          <table>
+            <tr><td>Product Name:</td><td>${order.productName}</td></tr>
+            <tr><td>Quantity:</td><td>${order.quantity}</td></tr>
+            <tr><td>Unit Price:</td><td>$${order.unitPrice.toFixed(2)}</td></tr>
+            <tr><td>Subtotal:</td><td>$${order.totalPrice.toFixed(2)}</td></tr>
+            <tr><td>Shipping:</td><td>$${order.shippingCost.toFixed(2)}</td></tr>
+            <tr><td>Freight Type:</td><td>${order.freightType ? (order.freightType === 'sea' ? 'Sea Freight' : 'Air Freight') : 'N/A'}</td></tr>
+            <tr><td>Status:</td><td>${order.status.charAt(0).toUpperCase() + order.status.slice(1)}</td></tr>
+          </table>
+        </div>
+        
+        <div class="total-section">
+          <div class="total-row">Total: $${order.finalAmount.toFixed(2)}</div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Create blob and download
+    const blob = new Blob([invoiceHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Invoice-${order.orderId}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    // Also try to print as PDF if possible
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(invoiceHTML);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+  };
+
+  const handleRateOrder = () => {
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = async () => {
+    if (!order || rating === 0) return;
+    
+    try {
+      // Here you would typically send the rating to the backend
+      // For now, we'll just show a success message
+      alert(`Thank you for your ${rating}-star rating!`);
+      setShowRatingModal(false);
+      setRating(0);
+      setRatingComment('');
+    } catch (error) {
+      console.error('Failed to submit rating:', error);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -380,21 +486,91 @@ const OrderDetailPage: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
               
               <div className="space-y-3">
-                <button className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all">
+                <button 
+                  onClick={handleContactSupport}
+                  className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg"
+                >
                   <MessageCircle className="w-4 h-4 mr-2" />
                   Contact Support
                 </button>
                 
-                <button className="w-full flex items-center justify-center px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+                <button 
+                  onClick={handleDownloadInvoice}
+                  className="w-full flex items-center justify-center px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                >
                   <Download className="w-4 h-4 mr-2" />
                   Download Invoice
                 </button>
                 
-                <button className="w-full flex items-center justify-center px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+                <button 
+                  onClick={handleRateOrder}
+                  className="w-full flex items-center justify-center px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                >
                   <Star className="w-4 h-4 mr-2" />
                   Rate Order
                 </button>
               </div>
+              
+              {/* Rating Modal */}
+              {showRatingModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+                    <h3 className="text-xl font-bold text-gray-900 mb-4">Rate Your Order</h3>
+                    
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600 mb-2">How would you rate this order?</p>
+                      <div className="flex space-x-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            onClick={() => setRating(star)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              star <= rating
+                                ? 'text-yellow-400 bg-yellow-50'
+                                : 'text-gray-300 hover:text-yellow-400'
+                            }`}
+                          >
+                            <Star className={`w-6 h-6 ${star <= rating ? 'fill-current' : ''}`} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Additional Comments (Optional)
+                      </label>
+                      <textarea
+                        value={ratingComment}
+                        onChange={(e) => setRatingComment(e.target.value)}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Share your experience..."
+                      />
+                    </div>
+                    
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => {
+                          setShowRatingModal(false);
+                          setRating(0);
+                          setRatingComment('');
+                        }}
+                        className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSubmitRating}
+                        disabled={rating === 0}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Submit Rating
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Order Summary */}

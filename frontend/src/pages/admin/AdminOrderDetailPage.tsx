@@ -294,32 +294,50 @@ const AdminOrderDetailPage: React.FC = () => {
                 Customer Information
               </h2>
               
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-gray-600">Customer Name</p>
-                  <p className="font-medium text-gray-900">{(order as any).customerName || 'N/A'}</p>
+              {order.userId ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <User className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">
+                          Customer Name
+                        </p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {order.userId.fullName || 'Unknown Customer'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {order.userId.email && (
+                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <Mail className="w-5 h-5 text-gray-500" />
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-600">Email</p>
+                        <p className="font-medium text-gray-900">{order.userId.email}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {order.userId.phone && (
+                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <Phone className="w-5 h-5 text-gray-500" />
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-600">Phone</p>
+                        <p className="font-medium text-gray-900">{order.userId.phone}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                
-                {(order as any).customerEmail && (
-                  <div className="flex items-center space-x-3">
-                    <Mail className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm text-gray-600">Email</p>
-                      <p className="font-medium text-gray-900">{(order as any).customerEmail}</p>
-                    </div>
-                  </div>
-                )}
-                
-                {(order as any).customerPhone && (
-                  <div className="flex items-center space-x-3">
-                    <Phone className="w-4 h-4 text-gray-500" />
-                    <div>
-                      <p className="text-sm text-gray-600">Phone</p>
-                      <p className="font-medium text-gray-900">{(order as any).customerPhone}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              ) : (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">Customer information not available</p>
+                </div>
+              )}
             </div>
 
             {/* Order Timeline */}

@@ -21,7 +21,8 @@ const orderSchema = new mongoose.Schema({
   },
   productLink: {
     type: String,
-    required: [true, 'Product link is required'],
+    required: false,
+    default: '',
     trim: true
   },
   productImage: {
@@ -62,6 +63,11 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['low', 'normal', 'medium', 'high', 'urgent'],
     default: 'normal'
+  },
+  freightType: {
+    type: String,
+    enum: ['sea', 'air'],
+    default: 'sea'
   },
   description: {
     type: String,

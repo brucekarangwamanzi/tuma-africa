@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { useChatStore } from './chatStore';
 
 export interface User {
   id: string;
@@ -107,7 +108,7 @@ export const useAuthStore = create<AuthStore>()(
             isLoading: false,
           });
 
-          toast.success('Registration successful! Please wait for admin approval.');
+          toast.success('Registration successful! Please check your email to verify your account.');
         } catch (error: any) {
           set({ isLoading: false });
           const message = error.response?.data?.message || 'Registration failed';
@@ -134,6 +135,15 @@ export const useAuthStore = create<AuthStore>()(
             refreshToken: null,
             isAuthenticated: false,
           });
+          
+          // Clear chat messages on logout
+          try {
+            useChatStore.getState().clearMessages();
+          } catch (error) {
+            // Ignore if chatStore is not available
+            console.error('Failed to clear chat messages on logout:', error);
+          }
+          
           toast.success('Logged out successfully');
         }
       },
@@ -158,28 +168,31 @@ export const useAuthStore = create<AuthStore>()(
             refreshToken: newRefreshToken,
           });
 
-          return true;
-        } catch (error) {
+        return true;
+      } catch (error: any) {
+        // Don't log 403 errors (invalid token) as they're expected when token is expired
+        if (error.response?.status !== 403) {
           console.error('Token refresh failed:', error);
-          get().clearAuth();
-          return false;
         }
+        get().clearAuth();
+        return false;
+      }
       },
 
       checkAuth: async () => {
         const { accessToken, refreshToken } = get();
         
         if (!accessToken || !refreshToken) {
-          set({ isLoading: false });
+          set({ isLoading: false, isAuthenticated: false });
           return;
         }
 
+        // Set authorization header immediately from persisted state
+        axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+        
         set({ isLoading: true });
 
         try {
-          // Set authorization header
-          axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
-          
           // Verify token by fetching user data
           const response = await axios.get('/auth/me');
           const { user } = response.data;
@@ -189,9 +202,12 @@ export const useAuthStore = create<AuthStore>()(
             isAuthenticated: true,
             isLoading: false,
           });
+          
+          console.log('✅ Authentication verified - user logged in');
         } catch (error: any) {
           // Try to refresh token if access token is expired
-          if (error.response?.status === 401) {
+          if (error.response?.status === 401 || error.response?.status === 403) {
+            console.log('🔄 Access token expired, attempting refresh...');
             const refreshed = await get().refreshAccessToken();
             
             if (refreshed) {
@@ -205,16 +221,19 @@ export const useAuthStore = create<AuthStore>()(
                   isAuthenticated: true,
                   isLoading: false,
                 });
+                console.log('✅ Token refreshed - user logged in');
                 return;
               } catch (retryError) {
                 console.error('Retry auth check failed:', retryError);
               }
+            } else {
+              console.log('❌ Token refresh failed - clearing auth');
             }
           }
           
           // Clear auth if all attempts failed
           get().clearAuth();
-          set({ isLoading: false });
+          set({ isLoading: false, isAuthenticated: false });
         }
       },
 
@@ -245,6 +264,13 @@ export const useAuthStore = create<AuthStore>()(
         refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
+      // Restore auth state and set axios headers on rehydration
+      onRehydrateStorage: () => (state) => {
+        if (state?.accessToken) {
+          axios.defaults.headers.common['Authorization'] = `Bearer ${state.accessToken}`;
+          console.log('✅ Auth state restored from localStorage');
+        }
+      },
     }
   )
 );

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Link2, ArrowRight, Image, UploadCloud, Send, Package, Inbox, UserCircle, Settings, PlusCircle, Check, ShoppingCart, Archive, Truck, Home, Menu, Briefcase, Globe, FileCheck } from 'lucide-react';
 import AdvertisementBanner from '../components/ui/AdvertisementBanner';
+import FeaturedProducts from '../components/home/FeaturedProducts';
 
 // --- Global Styles Component ---
 // This component injects all the custom CSS from the original <style> tag.
@@ -67,6 +68,38 @@ const GlobalStyles = () => (
 );
 
 const HomePage: React.FC = () => {
+  const navigate = useNavigate();
+  const [productLink, setProductLink] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleStartOrder = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    
+    if (!productLink.trim()) {
+      // If no link provided, just navigate to order page
+      navigate('/orders/new');
+      return;
+    }
+
+    // Navigate to order page with the product link
+    const params = new URLSearchParams({
+      link: productLink.trim()
+    });
+    
+    navigate(`/orders/new?${params.toString()}`);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleStartOrder();
+    }
+  };
+
+  // Focus input on mount for better UX
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   return (
     <>
       <GlobalStyles />
@@ -84,23 +117,29 @@ const HomePage: React.FC = () => {
           </p>
         </div>
 
-        {/* --- NEW: Enhanced "Magic Link" Box --- */}
+        {/* --- Enhanced "Magic Link" Box with Functional Input --- */}
         <div className="mt-12 max-w-2xl mx-auto">
-          <div className="bg-white p-4 rounded-xl shadow-lg border border-slate-200 flex flex-col sm:flex-row items-center gap-3 transition-all duration-300 focus-within:ring-2 focus-within:ring-orange-400 focus-within:shadow-xl">
-            <Link2 className="text-slate-400 h-6 w-6 hidden sm:block" />
-            <input 
-              type="text" 
-              placeholder="Paste your product link here..." 
-              className="w-full text-lg p-2 bg-transparent focus:outline-none" 
-            />
-            <Link
-              to="/orders/new"
-              className="btn-shine w-full sm:w-auto bg-orange-500 text-white font-semibold px-6 py-3 rounded-lg hover:bg-orange-600 transition-transform hover:scale-105 flex items-center justify-center gap-2"
-            >
-              <ArrowRight size={20} />
-              <span>Start Order</span>
-            </Link>
-          </div>
+          <form onSubmit={handleStartOrder}>
+            <div className="bg-white p-4 rounded-xl shadow-lg border border-slate-200 flex flex-col sm:flex-row items-center gap-3 transition-all duration-300 focus-within:ring-2 focus-within:ring-orange-400 focus-within:shadow-xl">
+              <Link2 className="text-slate-400 h-6 w-6 hidden sm:block flex-shrink-0" />
+              <input 
+                ref={inputRef}
+                type="url" 
+                value={productLink}
+                onChange={(e) => setProductLink(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Paste your product link here..." 
+                className="w-full text-lg p-2 bg-transparent focus:outline-none flex-1" 
+              />
+              <button
+                type="submit"
+                className="btn-shine w-full sm:w-auto btn-primary font-semibold px-6 py-3 rounded-lg transition-transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 touch-manipulation"
+              >
+                <ArrowRight size={20} />
+                <span>Start Order</span>
+              </button>
+            </div>
+          </form>
         </div>
 
         {/* Inline Advertisement */}
@@ -109,85 +148,7 @@ const HomePage: React.FC = () => {
         </div>
 
         {/* --- Shop Popular Products Section --- */}
-        <div className="mt-24">
-          <div className="text-center max-w-3xl mx-auto">
-            <h2 className="text-3xl font-bold tracking-tight text-slate-900">Shop Popular Products</h2>
-            <p className="mt-4 text-lg text-slate-600">
-              Order from a selection of our most popular and frequently purchased items. Added by our team for your convenience.
-            </p>
-          </div>
-
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* --- NEW: Enhanced Card with transition and hover --- */}
-            <div className="card-anim bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1">
-              <div className="aspect-square bg-slate-100 flex items-center justify-center">
-                <Image className="w-16 h-16 text-slate-400" />
-              </div>
-              <div className="p-4 flex flex-col flex-grow">
-                <h3 className="text-lg font-semibold text-slate-800">Wireless Bluetooth Earbuds</h3>
-                <p className="text-sm text-slate-500 mt-1">High-fidelity sound, 24-hour battery.</p>
-                <p className="text-lg font-semibold text-orange-600 mt-2">15,000 RWF</p>
-                <Link
-                  to="/orders/new"
-                  className="btn-shine w-full mt-4 bg-orange-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
-                >
-                  Quick Order
-                </Link>
-              </div>
-            </div>
-
-            <div className="card-anim bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1">
-              <div className="aspect-square bg-slate-100 flex items-center justify-center">
-                <Image className="w-16 h-16 text-slate-400" />
-              </div>
-              <div className="p-4 flex flex-col flex-grow">
-                <h3 className="text-lg font-semibold text-slate-800">Smart Fitness Watch</h3>
-                <p className="text-sm text-slate-500 mt-1">Track your health and workouts.</p>
-                <p className="text-lg font-semibold text-orange-600 mt-2">30,000 RWF</p>
-                <Link
-                  to="/orders/new"
-                  className="btn-shine w-full mt-4 bg-orange-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
-                >
-                  Quick Order
-                </Link>
-              </div>
-            </div>
-
-            <div className="card-anim bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1">
-              <div className="aspect-square bg-slate-100 flex items-center justify-center">
-                <Image className="w-16 h-16 text-slate-400" />
-              </div>
-              <div className="p-4 flex flex-col flex-grow">
-                <h3 className="text-lg font-semibold text-slate-800">Portable Power Bank</h3>
-                <p className="text-sm text-slate-500 mt-1">20,000mAh capacity, fast charging.</p>
-                <p className="text-lg font-semibold text-orange-600 mt-2">25,000 RWF</p>
-                <Link
-                  to="/orders/new"
-                  className="btn-shine w-full mt-4 bg-orange-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
-                >
-                  Quick Order
-                </Link>
-              </div>
-            </div>
-
-            <div className="card-anim bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1">
-              <div className="aspect-square bg-slate-100 flex items-center justify-center">
-                <Image className="w-16 h-16 text-slate-400" />
-              </div>
-              <div className="p-4 flex flex-col flex-grow">
-                <h3 className="text-lg font-semibold text-slate-800">LED Ring Light</h3>
-                <p className="text-sm text-slate-500 mt-1">Perfect for streaming and video calls.</p>
-                <p className="text-lg font-semibold text-orange-600 mt-2">22,000 RWF</p>
-                <Link
-                  to="/orders/new"
-                  className="btn-shine w-full mt-4 bg-orange-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
-                >
-                  Quick Order
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+        <FeaturedProducts />
 
         {/* --- Partners Section --- */}
         <div className="mt-24">
@@ -196,20 +157,7 @@ const HomePage: React.FC = () => {
           </div>
 
           <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* --- NEW: Enhanced Card with transition and hover --- */}
             <div className="card-anim bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4 transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1" style={{animationDelay: '0.1s'}}>
-              <div className="flex-shrink-0 bg-orange-100 text-orange-600 w-12 h-12 rounded-lg flex items-center justify-center">
-                <Briefcase className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-slate-800">Tuma Logistics</h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Fast, reliable logistics and customs clearing across East Africa. We handle the heavy lifting so you don't have to.
-                </p>
-              </div>
-            </div>
-
-            <div className="card-anim bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4 transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1" style={{animationDelay: '0.2s'}}>
               <div className="flex-shrink-0 bg-slate-100 text-slate-600 w-12 h-12 rounded-lg flex items-center justify-center">
                 <Briefcase className="w-6 h-6" />
               </div>
@@ -220,6 +168,30 @@ const HomePage: React.FC = () => {
                 </p>
               </div>
             </div>
+
+            {/* Africa Link Cargo - Clickable Partner Card */}
+            <a
+              href="https://www.africalinkcargo.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="card-anim bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4 transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1 cursor-pointer group"
+              style={{animationDelay: '0.2s'}}
+            >
+              <div className="flex-shrink-0 bg-gradient-to-br from-blue-500 to-blue-600 text-white w-12 h-12 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Truck className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xl font-semibold text-slate-800 group-hover:text-primary-600 transition-colors">
+                    Africa Link Cargo
+                  </h3>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                </div>
+                <p className="text-sm text-slate-500 mt-1">
+                  Your trusted partner for seamless logistics solutions across Africa and China. We connect continents, empower businesses, and deliver promises with speed and reliability.
+                </p>
+              </div>
+            </a>
           </div>
         </div>
 

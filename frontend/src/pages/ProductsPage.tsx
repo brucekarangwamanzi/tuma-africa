@@ -181,7 +181,7 @@ const ProductsPage: React.FC = () => {
               View Details
             </Link>
             <Link
-              to={`/orders/new?product=${encodeURIComponent(product.name)}&link=${encodeURIComponent(product.imageUrl)}&price=${product.price}`}
+              to={`/products/${product._id}`}
               className="btn-primary btn-sm"
             >
               <ShoppingBag className="h-4 w-4 mr-1" />

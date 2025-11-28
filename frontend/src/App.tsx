@@ -4,6 +4,8 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useAuthStore } from './store/authStore';
 import { useSettingsStore } from './store/settingsStore';
+import { useTheme } from './hooks/useTheme';
+import './styles/theme.css';
 
 // Layout Components
 import Navbar from './components/layout/Navbar';
@@ -24,6 +26,8 @@ import NewOrderPage from './pages/NewOrderPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import MessagesPage from './pages/MessagesPage';
+import NotificationsPage from './pages/NotificationsPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -46,11 +50,30 @@ import AdminRoute from './components/auth/AdminRoute';
 function App() {
   const { user, checkAuth } = useAuthStore();
   const { fetchSettings } = useSettingsStore();
+  
+  // Initialize theme system
+  useTheme();
 
   useEffect(() => {
-    // Load auth and settings in background without blocking UI
-    checkAuth();
-    fetchSettings();
+    // Initialize auth state on app load
+    // This will restore persisted auth state and verify tokens
+    const initializeApp = async () => {
+      // Check if we have persisted auth state
+      const authState = useAuthStore.getState();
+      
+      if (authState.accessToken && authState.refreshToken) {
+        // We have tokens, verify them
+        await checkAuth();
+      } else {
+        // No tokens, ensure we're logged out
+        useAuthStore.getState().clearAuth();
+      }
+      
+      // Load settings
+      fetchSettings();
+    };
+
+    initializeApp();
   }, [checkAuth, fetchSettings]);
 
   return (
@@ -73,6 +96,7 @@ function App() {
             path="/register" 
             element={user ? <Navigate to="/dashboard" replace /> : <RegisterPage />} 
           />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           
           {/* Protected User Routes */}
           <Route path="/dashboard" element={
@@ -108,6 +132,12 @@ function App() {
           <Route path="/messages" element={
             <ProtectedRoute>
               <MessagesPage />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <NotificationsPage />
             </ProtectedRoute>
           } />
           

@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, User, LogOut, Settings, ShoppingBag, Package } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import NotificationBell from '../ui/NotificationBell';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -114,7 +115,11 @@ const Navbar: React.FC = () => {
           {/* User Menu / Auth Buttons */}
           <div className="flex items-center space-x-4">
             {user ? (
-              <div className="relative">
+              <>
+                {/* Notification Bell */}
+                <NotificationBell />
+                
+                <div className="relative">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   className="flex items-center space-x-2 text-gray-700 hover:text-primary-600 focus:outline-none"
@@ -143,10 +148,10 @@ const Navbar: React.FC = () => {
                       <p className="text-xs text-gray-500">{user.email}</p>
                       <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
                         user.role === 'super_admin' 
-                          ? 'bg-purple-100 text-purple-800'
+                          ? 'badge-accent'
                           : user.role === 'admin'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'badge-primary'
+                          : 'badge-secondary'
                       }`}>
                         {user.role.replace('_', ' ').toUpperCase()}
                       </span>
@@ -182,6 +187,7 @@ const Navbar: React.FC = () => {
                   </div>
                 )}
               </div>
+              </>
             ) : (
               <div className="flex items-center space-x-3">
                 <Link

@@ -64,8 +64,12 @@ const validateOrderCreation = [
     .withMessage('Product name must be between 2 and 200 characters'),
   
   body('productLink')
-    .optional()
-    .isURL({ protocols: ['http', 'https'] })
+    .optional({ checkFalsy: true })
+    .custom((value) => {
+      if (!value || value === '' || value === null || value === undefined) return true; // Allow empty/falsy values
+      if (typeof value !== 'string') return false;
+      return /^https?:\/\/.+/.test(value); // Validate URL format if provided
+    })
     .withMessage('Please provide a valid product URL'),
   
   body('quantity')
@@ -85,6 +89,11 @@ const validateOrderCreation = [
     .optional()
     .isIn(['low', 'normal', 'medium', 'high', 'urgent'])
     .withMessage('Invalid priority value'),
+  
+  body('freightType')
+    .optional()
+    .isIn(['sea', 'air'])
+    .withMessage('Freight type must be either "sea" or "air"'),
   
   body('description')
     .optional()
