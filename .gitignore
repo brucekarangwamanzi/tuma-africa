@@ -103,3 +103,10 @@ ADMIN_CREDENTIALS.md
 clear-storage.html
 QUICK_FIX.md
 TROUBLESHOOTING.md
+.vercel
+
+# Deployment secrets
+secrets.txt
+# Deployment documentation and secrets
+secrets.txt
+*.txt
