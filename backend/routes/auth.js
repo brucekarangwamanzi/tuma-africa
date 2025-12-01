@@ -30,7 +30,7 @@ const generateTokens = (userId, role) => {
 // @access  Public
 router.post('/register', validateUserRegistration, async (req, res) => {
   try {
-    const { fullName, email, phone, password } = req.body;
+    const { fullName, email, phone, password, currency } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ 
@@ -51,6 +51,7 @@ router.post('/register', validateUserRegistration, async (req, res) => {
       email,
       phone,
       passwordHash: password, // Will be hashed by pre-save middleware
+      currency: currency || 'USD', // Default to USD if not provided
       role: 'user',
       verified: false,
       approved: false

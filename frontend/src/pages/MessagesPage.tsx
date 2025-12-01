@@ -118,19 +118,60 @@ const MessagesPage: React.FC = () => {
       // Always fetch messages on mount/refresh to ensure we have all messages
       console.log('🔄 Initializing chat - fetching messages from server...');
       
-      // First, show persisted messages immediately (if any)
+      // First, show persisted messages immediately (if any) - they're already in the store
       const persistedMessages = useChatStore.getState().messages;
+      const persistedChatId = useChatStore.getState().currentChatId;
+      
       if (persistedMessages.length > 0) {
-        console.log(`📦 Showing ${persistedMessages.length} persisted messages while fetching...`);
+        console.log(`📦 Showing ${persistedMessages.length} persisted messages immediately`);
+        // Set chatId from persisted state if available
+        if (persistedChatId && isMounted) {
+          setChatId(persistedChatId);
+          console.log(`📦 Using persisted chatId: ${persistedChatId}`);
+        }
       }
       
-      // Then fetch fresh messages from server
-      const id = await fetchMessages();
-      if (id && isMounted) {
-        setChatId(id);
-        console.log(`✅ Chat initialized with ID: ${id}`);
-      } else if (isMounted) {
-        console.warn('⚠️ No chat ID returned from server');
+      // Then fetch fresh messages from server - Always fetch for users to get latest
+      // This ensures we have the most up-to-date messages while showing persisted ones immediately
+      try {
+        const id = await fetchMessages();
+        if (id && isMounted) {
+          setChatId(id);
+          console.log(`✅ Chat initialized with ID: ${id}, ${useChatStore.getState().messages.length} messages loaded`);
+        } else if (isMounted) {
+          console.warn('⚠️ No chat ID returned from server');
+          // For users, try to fetch again after a short delay
+          if (user?.role === 'user') {
+            setTimeout(async () => {
+              if (isMounted) {
+                const retryId = await fetchMessages();
+                if (retryId) {
+                  setChatId(retryId);
+                  console.log(`✅ Chat initialized on retry with ID: ${retryId}`);
+                }
+              }
+            }, 1000);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch messages on mount:', error);
+        // For users, retry once - but keep persisted messages visible
+        if (user?.role === 'user' && isMounted) {
+          setTimeout(async () => {
+            if (isMounted) {
+              try {
+                const retryId = await fetchMessages();
+                if (retryId) {
+                  setChatId(retryId);
+                  console.log(`✅ Chat initialized on retry with ID: ${retryId}`);
+                }
+              } catch (retryError) {
+                console.error('Retry fetch messages failed:', retryError);
+                // Even if fetch fails, persisted messages are still visible
+              }
+            }
+          }, 2000);
+        }
       }
       
       if (isMounted) {
@@ -168,6 +209,7 @@ const MessagesPage: React.FC = () => {
             useChatStore.setState((state) => {
               const messageExists = state.messages.some(msg => msg.id === newMsg.id);
               if (messageExists) {
+                console.log(`⚠️ Duplicate message ${newMsg.id} - skipping`);
                 return state; // Don't add duplicate
               }
               
@@ -176,10 +218,19 @@ const MessagesPage: React.FC = () => {
                 new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
               );
               
+              console.log(`✅ Added new message ${newMsg.id} to store. Total: ${updatedMessages.length}`);
+              
               return {
                 messages: updatedMessages
               };
             });
+            
+            // Update chatId if provided in the message data
+            if (data.chatId && data.chatId !== chatId) {
+              setChatId(data.chatId);
+              useChatStore.setState({ currentChatId: data.chatId });
+              console.log(`✅ Updated chatId to: ${data.chatId}`);
+            }
 
             // Update conversation list with new message
             if (newMsg.senderId !== user?.id) {

@@ -12,6 +12,7 @@ interface RegisterFormData {
   phone: string;
   password: string;
   confirmPassword: string;
+  currency: string;
   agreeToTerms: boolean;
 }
 
@@ -45,7 +46,8 @@ const RegisterPage: React.FC = () => {
         fullName: data.fullName,
         email: data.email,
         phone: data.phone,
-        password: data.password
+        password: data.password,
+        currency: data.currency || 'USD'
       });
       navigate('/dashboard');
     } catch (error: any) {
@@ -196,6 +198,27 @@ const RegisterPage: React.FC = () => {
                 </div>
                 {errors.phone && (
                   <p className="mt-1 text-sm text-error-600">{errors.phone.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="currency" className="label">
+                  Preferred Currency
+                </label>
+                <select
+                  id="currency"
+                  {...register('currency', {
+                    required: 'Currency selection is required'
+                  })}
+                  className={`input ${errors.currency ? 'input-error' : ''}`}
+                  defaultValue="USD"
+                >
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="RWF">RWF - Rwandan Franc</option>
+                  <option value="Yuan">Yuan - Chinese Yuan</option>
+                </select>
+                {errors.currency && (
+                  <p className="mt-1 text-sm text-error-600">{errors.currency.message}</p>
                 )}
               </div>
 

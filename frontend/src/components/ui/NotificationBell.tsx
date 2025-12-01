@@ -33,13 +33,55 @@ const NotificationBell: React.FC = () => {
     }
   }, [user, isOpen]);
 
+  // Fetch notifications on mount for users (not just when dropdown opens)
+  useEffect(() => {
+    if (user && user.role === 'user') {
+      // Fetch notifications immediately for regular users
+      fetchNotifications(1, false).catch(() => {
+        // Silently fail - will retry on next poll
+      });
+    }
+  }, [user?.id]); // Only fetch when user ID changes
+
   // Listen for real-time notifications via WebSocket
   useEffect(() => {
     if (!ws || !user) return;
 
-    const handleNewNotification = (notification: any) => {
+    const handleNewNotification = async (notification: any) => {
       // addNotification already increments unreadCount, no need for API call
       useNotificationStore.getState().addNotification(notification);
+      
+      // Show browser notification if permission granted (for users especially)
+      if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+          const browserNotification = new Notification(notification.title || 'New Notification', {
+            body: notification.message || '',
+            icon: '/favicon.ico',
+            badge: '/favicon.ico',
+            tag: notification._id, // Prevent duplicate notifications
+            requireInteraction: notification.priority === 'high' || notification.priority === 'urgent'
+          });
+          
+          // Auto-close after 5 seconds
+          setTimeout(() => {
+            browserNotification.close();
+          }, 5000);
+          
+          // Navigate to notification link when clicked
+          browserNotification.onclick = () => {
+            window.focus();
+            if (notification.link) {
+              navigate(notification.link);
+            }
+            browserNotification.close();
+          };
+        } catch (error) {
+          // Silently fail if browser notification fails
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Failed to show browser notification:', error);
+          }
+        }
+      }
     };
 
     ws.onNotification(handleNewNotification);
@@ -47,7 +89,7 @@ const NotificationBell: React.FC = () => {
     return () => {
       ws.offNotification(handleNewNotification);
     };
-  }, [ws, user]);
+  }, [ws, user, navigate]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

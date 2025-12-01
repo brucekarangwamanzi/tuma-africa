@@ -78,20 +78,22 @@ export const useChatStore = create<ChatState>()(
       
       console.log(`📨 Loaded ${sortedMessages.length} messages from server`);
       
-      // Merge with existing messages to avoid duplicates and preserve any optimistic messages
+      // For users, always use server messages as source of truth
+      // But preserve any optimistic (temp) messages that haven't been confirmed yet
       const existingMessages = get().messages;
       const messageMap = new Map<string, Message>();
       
-      // Add existing messages first (preserves optimistic messages)
-      existingMessages.forEach(msg => {
-        if (!msg.id.startsWith('temp-')) { // Don't persist temporary messages
-          messageMap.set(msg.id, msg);
-        }
-      });
-      
-      // Add/update with server messages
+      // First, add server messages (source of truth)
       sortedMessages.forEach((msg: Message) => {
         messageMap.set(msg.id, msg);
+      });
+      
+      // Then, add any optimistic messages that aren't in server response yet
+      existingMessages.forEach(msg => {
+        if (msg.id.startsWith('temp-')) {
+          // Keep optimistic messages that haven't been confirmed
+          messageMap.set(msg.id, msg);
+        }
       });
       
       // Convert back to array and sort
@@ -99,12 +101,22 @@ export const useChatStore = create<ChatState>()(
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
       
-      set({
+      console.log(`📊 Merged ${mergedMessages.length} messages (${sortedMessages.length} from server, ${existingMessages.filter(m => m.id.startsWith('temp-')).length} optimistic)`);
+      
+      // Always set chatId if provided, even if messages array is empty
+      const updates: Partial<ChatState> = {
         messages: mergedMessages,
-        currentChatId: chatId,
         isLoading: false,
         unreadCount: 0
-      });
+      };
+      
+      // Set chatId if provided (important for persistence)
+      if (chatId) {
+        updates.currentChatId = chatId;
+        console.log(`✅ Set chatId: ${chatId}`);
+      }
+      
+      set(updates);
       
       return chatId;
     } catch (error: any) {
@@ -249,11 +261,12 @@ export const useChatStore = create<ChatState>()(
         currentChatId: state.currentChatId,
         unreadCount: state.unreadCount,
       }),
-      // On rehydration, merge persisted messages with fresh fetch
+      // On rehydration, ensure messages are available immediately
       onRehydrateStorage: () => (state) => {
         if (state) {
-          console.log(`📦 Restored ${state.messages.length} messages from localStorage`);
-          // Messages will be refreshed from server on page load, but we keep them for instant display
+          console.log(`📦 Restored ${state.messages.length} messages and chatId ${state.currentChatId} from localStorage`);
+          // Messages are restored and will be merged with server messages on fetch
+          // This ensures users see messages immediately while fresh data loads
         }
       },
     }

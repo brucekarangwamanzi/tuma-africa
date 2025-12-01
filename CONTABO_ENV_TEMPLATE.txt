@@ -1,0 +1,58 @@
+# Contabo VPS Environment Variables Template
+# Copy these to backend/.env on your server
+
+# ============================================
+# BACKEND .env FILE
+# Location: /var/www/tuma-africa/backend/.env
+# ============================================
+
+# Server Configuration
+PORT=5001
+NODE_ENV=production
+HOST=0.0.0.0
+
+# Database (MongoDB Atlas recommended)
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/dbname?retryWrites=true&w=majority
+
+# JWT Secrets (Already generated - use from secrets.txt)
+JWT_SECRET=crKbcgas8cuVURJR4f3xEukxsQ1aETGxQ6NYCrmME6B+7nnV1xHi4l/jG9/TE+BF
+JWT_REFRESH_SECRET=clgq5bvDhJjfra/GK/fA4BDRPiktR9bs7nQk0TzFJedhZHUOgfdvJ1EuKPf9gH3H
+JWT_EXPIRE=24h
+JWT_REFRESH_EXPIRE=7d
+
+# Security
+BCRYPT_ROUNDS=12
+
+# Rate Limiting
+RATE_LIMIT_WINDOW=15
+RATE_LIMIT_MAX=500
+
+# CORS
+FRONTEND_URL=https://tuma.com
+
+# Email Configuration (Gmail)
+EMAIL_USER=your-email@gmail.com
+EMAIL_APP_PASSWORD=your-gmail-app-password
+
+# Cloudinary (Optional - for image uploads)
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+
+# ============================================
+# FRONTEND .env.production FILE
+# Location: /var/www/tuma-africa/frontend/.env.production
+# ============================================
+
+REACT_APP_API_URL=https://tuma.com/api
+REACT_APP_WS_URL=https://tuma.com
+
+# ============================================
+# INSTRUCTIONS
+# ============================================
+# 1. Replace 'yourdomain.com' with your actual domain
+# 2. Replace MongoDB URI with your MongoDB Atlas connection string
+# 3. Replace email credentials with your Gmail App Password
+# 4. JWT secrets are already generated and ready to use
+# 5. Cloudinary is optional - only if using image uploads
+

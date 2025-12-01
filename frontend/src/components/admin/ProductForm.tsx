@@ -41,6 +41,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
     description: "",
     price: 0,
     originalPrice: 0,
+    currency: "USD",
     imageUrl: "",
     images: [] as string[],
     category: "",
@@ -108,6 +109,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
         description: currentProduct.description,
         price: currentProduct.price,
         originalPrice: currentProduct.originalPrice || 0,
+        currency: currentProduct.currency || "USD",
         imageUrl: currentProduct.imageUrl,
         images: currentProduct.images || [],
         category: currentProduct.category,
@@ -425,7 +427,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Price *
@@ -444,6 +446,23 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
                         required
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Currency *
+                    </label>
+                    <select
+                      name="currency"
+                      value={formData.currency}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="USD">USD</option>
+                      <option value="RWF">RWF</option>
+                      <option value="Yuan">Yuan</option>
+                    </select>
                   </div>
 
                   <div>

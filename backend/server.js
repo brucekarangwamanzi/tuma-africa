@@ -344,41 +344,48 @@ io.on('connection', (socket) => {
       socket.emit('message:new', messageData);
       console.log(`📤 Confirmed message ${savedMessage._id} to sender`);
       
-      // Emit to all participants except sender
+      // Emit to all participants except sender - Target specific users in the chat
       const participantIds = chat.participants.map(p => p.toString());
       participantIds.forEach(participantId => {
         if (participantId !== userIdStr) {
+          // Emit to specific user
           io.to(`user:${participantId}`).emit('message:new', messageData);
           console.log(`📤 Sent message to participant ${participantId}`);
         }
       });
       
-      // Emit to all admins (if sender is not admin)
+      // Also notify admins if sender is a regular user (for admin dashboard)
       if (socket.userRole !== 'admin' && socket.userRole !== 'super_admin') {
         io.to('admins').emit('message:new', messageData);
         console.log(`📢 Notified all admins about message from ${socket.userName}`);
-      } else {
-        // If admin sent message, notify all users in the chat
-        io.to('users').emit('message:new', messageData);
-        console.log(`📢 Notified users about message from admin ${socket.userName}`);
       }
+      // Note: When admin sends message, we already notified specific participants above
+      // No need to broadcast to all users - only notify the specific user in the chat
 
       // Create notifications for message (non-blocking)
       try {
         const sender = await User.findById(socket.userId).select('fullName email role');
         if (sender) {
-          // Ensure chat participants are populated
-          if (!chat.populated('participants')) {
-            await chat.populate('participants', 'fullName email role');
-          }
+          // Always populate participants to ensure we have user data
+          await chat.populate('participants', 'fullName email role');
           
           // Create notifications for all participants except sender
           const notifications = await createMessageNotification(chat, savedMessage, sender, io);
           console.log(`📧 Created ${notifications.length} notification(s) for message`);
+          
+          // Log notification details for debugging
+          if (notifications.length > 0) {
+            notifications.forEach(notif => {
+              console.log(`  → Notification for user ${notif.userId}: ${notif.title}`);
+            });
+          } else {
+            console.warn(`⚠️ No notifications created. Chat has ${chat.participants.length} participants, sender is ${sender._id}`);
+          }
         }
       } catch (notifError) {
-        // Don't fail message send if notification fails
+        // Don't fail message send if notification fails, but log the error
         console.error('⚠️ Failed to create message notification (non-critical):', notifError.message);
+        console.error('Notification error stack:', notifError.stack);
       }
       
     } catch (error) {

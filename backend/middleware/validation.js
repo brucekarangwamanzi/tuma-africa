@@ -138,8 +138,8 @@ const validateProductCreation = [
   
   body('description')
     .trim()
-    .isLength({ min: 10, max: 1000 })
-    .withMessage('Description must be between 10 and 1000 characters'),
+    .isLength({ min: 3, max: 1000 })
+    .withMessage('Description must be between 3 and 1000 characters'),
   
   body('price')
     .isFloat({ min: 0 })
@@ -151,8 +151,37 @@ const validateProductCreation = [
     .withMessage('Category must be between 2 and 50 characters'),
   
   body('imageUrl')
-    .isURL()
-    .withMessage('Please provide a valid image URL'),
+    .optional({ checkFalsy: true })
+    .trim()
+    .custom((value, { req }) => {
+      // If images array is provided, imageUrl is optional
+      if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
+        return true; // imageUrl is optional when images array exists
+      }
+      // Otherwise, imageUrl is required
+      if (!value || typeof value !== 'string' || !value.trim()) {
+        throw new Error('Product image URL is required when no images are uploaded');
+      }
+      const trimmed = value.trim();
+      // Allow various URL formats
+      return trimmed.startsWith('http://') || 
+             trimmed.startsWith('https://') || 
+             trimmed.startsWith('data:image/') || 
+             trimmed.startsWith('blob:') ||
+             trimmed.startsWith('/') ||
+             trimmed.length > 0;
+    })
+    .withMessage('Please provide a valid image URL or upload images'),
+  
+  body('images')
+    .optional()
+    .isArray()
+    .withMessage('Images must be an array'),
+  
+  body('currency')
+    .optional()
+    .isIn(['USD', 'RWF', 'Yuan'])
+    .withMessage('Currency must be USD, RWF, or Yuan'),
   
   handleValidationErrors
 ];

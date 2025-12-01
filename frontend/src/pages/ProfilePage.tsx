@@ -9,6 +9,7 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 interface ProfileFormData {
   fullName: string;
   phone: string;
+  currency: string;
   address: {
     street: string;
     city: string;
@@ -41,6 +42,7 @@ const ProfilePage: React.FC = () => {
     defaultValues: {
       fullName: user?.fullName || '',
       phone: user?.phone || '',
+      currency: user?.currency || 'USD',
       address: {
         street: user?.address?.street || '',
         city: user?.address?.city || '',
@@ -328,6 +330,23 @@ const ProfilePage: React.FC = () => {
                         </div>
                         {profileErrors.phone && (
                           <p className="text-error-600 text-sm mt-1">{profileErrors.phone.message}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="label">Preferred Currency</label>
+                        <select
+                          {...registerProfile('currency', {
+                            required: 'Currency is required'
+                          })}
+                          className={`input ${profileErrors.currency ? 'input-error' : ''}`}
+                        >
+                          <option value="USD">USD - US Dollar</option>
+                          <option value="RWF">RWF - Rwandan Franc</option>
+                          <option value="Yuan">Yuan - Chinese Yuan</option>
+                        </select>
+                        {profileErrors.currency && (
+                          <p className="text-error-600 text-sm mt-1">{profileErrors.currency.message}</p>
                         )}
                       </div>
                     </div>

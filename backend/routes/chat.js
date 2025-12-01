@@ -707,68 +707,7 @@ router.delete('/:chatId', authenticateToken, requireRole(['admin', 'super_admin'
   }
 });
 
-// @route   GET /api/chat/messages
-// @desc    Get user's chat messages (simplified)
-// @access  Private
-router.get('/messages', authenticateToken, requireApproval, async (req, res) => {
-  try {
-    // Find or create user's support chat
-    let chat = await Chat.findOne({
-      participants: req.user._id,
-      chatType: 'support'
-    }).populate('participants', 'fullName email role profileImage');
-
-    if (!chat) {
-      // Create new support chat
-      const admin = await require('../models/User').findOne({ 
-        role: { $in: ['admin', 'super_admin'] }, 
-        isActive: true 
-      });
-
-      const participants = [req.user._id];
-      if (admin) participants.push(admin._id);
-
-      chat = new Chat({
-        participants,
-        chatType: 'support',
-        title: `Support Chat - ${req.user.fullName}`,
-        status: 'open',
-        priority: 'medium',
-        messages: []
-      });
-
-      await chat.save();
-      await chat.populate('participants', 'fullName email role profileImage');
-    }
-
-    // Transform messages to match frontend expectations
-    const messages = chat.messages.map(msg => ({
-      id: msg._id.toString(),
-      senderId: msg.sender?.toString() || 'system',
-      senderName: msg.sender ? 
-        chat.participants.find(p => p._id.toString() === msg.sender.toString())?.fullName || 'Unknown' :
-        'System',
-      senderRole: msg.sender ? 
-        chat.participants.find(p => p._id.toString() === msg.sender.toString())?.role || 'user' :
-        'system',
-      content: msg.text || '',
-      type: msg.type || 'text',
-      fileUrl: msg.fileUrl,
-      fileName: msg.fileName,
-      timestamp: msg.createdAt.toISOString(),
-      status: msg.isRead ? 'read' : 'delivered'
-    }));
-
-    res.json({
-      messages,
-      chatId: chat._id.toString()
-    });
-
-  } catch (error) {
-    console.error('Get messages error:', error);
-    res.status(500).json({ message: 'Failed to fetch messages' });
-  }
-});
+// Duplicate route removed - using the main route at line 119
 
 // @route   POST /api/chat/messages
 // @desc    Send a new message (simplified)
@@ -936,51 +875,7 @@ router.put('/messages/read-all', authenticateToken, async (req, res) => {
   }
 });
 
-// @route   GET /api/chat/messages
-// @desc    Get messages for current user's chat
-// @access  Private
-router.get('/messages', authenticateToken, requireApproval, async (req, res) => {
-  try {
-    // Find or create a chat for the user
-    let chat = await Chat.findOne({ 
-      participants: req.user._id,
-      type: 'support' 
-    });
-
-    if (!chat) {
-      // Create a new support chat
-      chat = new Chat({
-        participants: [req.user._id],
-        type: 'support',
-        title: 'Customer Support',
-        status: 'active',
-        priority: 'normal'
-      });
-      await chat.save();
-    }
-
-    // Populate the chat with messages and participants
-    await chat.populate([
-      {
-        path: 'messages.sender',
-        select: 'fullName email role'
-      },
-      {
-        path: 'participants',
-        select: 'fullName email role'
-      }
-    ]);
-
-    res.json({
-      chatId: chat._id,
-      messages: chat.messages || []
-    });
-
-  } catch (error) {
-    console.error('Get messages error:', error);
-    res.status(500).json({ message: 'Failed to fetch messages' });
-  }
-});
+// Duplicate route removed - using the main route at line 119
 
 // @route   POST /api/chat/messages
 // @desc    Send a message

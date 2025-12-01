@@ -11,6 +11,7 @@ interface User {
   approved: boolean;
   verified: boolean;
   isActive: boolean;
+  currency?: 'RWF' | 'Yuan' | 'USD';
   profileImage?: string;
   address?: {
     street?: string;

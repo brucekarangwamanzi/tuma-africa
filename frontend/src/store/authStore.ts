@@ -12,6 +12,7 @@ export interface User {
   role: 'user' | 'admin' | 'super_admin';
   verified: boolean;
   approved: boolean;
+  currency?: 'RWF' | 'Yuan' | 'USD';
   profileImage?: string;
   address?: {
     street?: string;
@@ -39,6 +40,7 @@ interface AuthActions {
     email: string;
     phone: string;
     password: string;
+    currency?: string;
   }) => Promise<void>;
   logout: () => void;
   refreshAccessToken: () => Promise<boolean>;
@@ -143,8 +145,6 @@ export const useAuthStore = create<AuthStore>()(
             // Ignore if chatStore is not available
             console.error('Failed to clear chat messages on logout:', error);
           }
-          
-          toast.success('Logged out successfully');
         }
       },
 

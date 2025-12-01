@@ -67,13 +67,16 @@ router.put('/profile',
         });
       }
 
-      const { fullName, phone, address, profileImage } = req.body;
+      const { fullName, phone, address, profileImage, currency } = req.body;
       
       const updateData = {};
       if (fullName) updateData.fullName = fullName;
       if (phone) updateData.phone = phone;
       if (address) updateData.address = { ...req.user.address, ...address };
       if (profileImage) updateData.profileImage = profileImage;
+      if (currency && ['RWF', 'Yuan', 'USD'].includes(currency)) {
+        updateData.currency = currency;
+      }
 
       const user = await User.findByIdAndUpdate(
         req.user._id,

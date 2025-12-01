@@ -63,6 +63,11 @@ const userSchema = new mongoose.Schema({
     country: String,
     zipCode: String
   },
+  currency: {
+    type: String,
+    enum: ['RWF', 'Yuan', 'USD'],
+    default: 'USD'
+  },
   refreshToken: String,
   lastLogin: Date,
   isActive: {

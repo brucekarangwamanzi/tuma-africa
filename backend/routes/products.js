@@ -164,17 +164,55 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 // @route   POST /api/products
 // @desc    Create new product
-// @access  Private (Admin/Super Admin)
-router.post('/', authenticateToken, requireRole(['admin', 'super_admin']), validateProductCreation, async (req, res) => {
+// @access  Private (Super Admin only)
+router.post('/', authenticateToken, requireRole(['super_admin']), validateProductCreation, async (req, res) => {
   try {
+    console.log('📦 POST /api/products - Request received');
+    console.log('👤 User:', req.user?.email, 'Role:', req.user?.role);
+    console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
+    
     const productData = {
       ...req.body,
       createdBy: req.user._id,
       lastUpdatedBy: req.user._id
     };
 
+    // Ensure isActive is true by default for super admin created products
+    if (productData.isActive === undefined) {
+      productData.isActive = true;
+    }
+    
+    // Ensure currency has a default value
+    if (!productData.currency) {
+      productData.currency = 'USD';
+    }
+    
+    // If images array is provided but no imageUrl, use first image as imageUrl
+    if (productData.images && Array.isArray(productData.images) && productData.images.length > 0) {
+      if (!productData.imageUrl) {
+        productData.imageUrl = productData.images[0];
+      }
+    }
+    
+    // Ensure at least one image exists (either imageUrl or images array)
+    if (!productData.imageUrl && (!productData.images || productData.images.length === 0)) {
+      return res.status(400).json({ 
+        message: 'At least one product image is required (either imageUrl or images array)' 
+      });
+    }
+
+    console.log('💾 Product data to save:', JSON.stringify(productData, null, 2));
+
     const product = new Product(productData);
     await product.save();
+
+    console.log('✅ Product saved to database:', product._id);
+
+    // Populate createdBy and lastUpdatedBy for response
+    await product.populate('createdBy', 'fullName email');
+    await product.populate('lastUpdatedBy', 'fullName email');
+
+    console.log('✅ Product populated and ready to send');
 
     res.status(201).json({
       message: 'Product created successfully',
@@ -182,23 +220,44 @@ router.post('/', authenticateToken, requireRole(['admin', 'super_admin']), valid
     });
 
   } catch (error) {
-    console.error('Create product error:', error);
+    console.error('❌ Create product error:', error);
+    console.error('📋 Error details:', error.message);
+    console.error('📦 Product data received:', req.body);
+    console.error('🔍 Error stack:', error.stack);
+    
+    // Return more detailed error for debugging
     res.status(500).json({ 
       message: 'Failed to create product',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
 
 // @route   PUT /api/products/:id
 // @desc    Update product
-// @access  Private (Admin/Super Admin)
-router.put('/:id', authenticateToken, requireRole(['admin', 'super_admin']), async (req, res) => {
+// @access  Private (Super Admin only)
+router.put('/:id', authenticateToken, requireRole(['super_admin']), validateProductCreation, async (req, res) => {
   try {
+    console.log('🔄 PUT /api/products/:id - Request received');
+    console.log('👤 User:', req.user?.email, 'Role:', req.user?.role);
+    console.log('📋 Product ID:', req.params.id);
+    console.log('📋 Request body:', JSON.stringify(req.body, null, 2));
+    
     const updates = {
       ...req.body,
       lastUpdatedBy: req.user._id
     };
+
+    // Ensure price is a number
+    if (updates.price !== undefined) {
+      updates.price = parseFloat(updates.price);
+      if (isNaN(updates.price) || updates.price < 0) {
+        return res.status(400).json({ message: 'Price must be a valid positive number' });
+      }
+    }
+
+    console.log('💾 Updates to apply:', JSON.stringify(updates, null, 2));
 
     const product = await Product.findByIdAndUpdate(
       req.params.id,
@@ -207,8 +266,17 @@ router.put('/:id', authenticateToken, requireRole(['admin', 'super_admin']), asy
     );
 
     if (!product) {
+      console.error('❌ Product not found:', req.params.id);
       return res.status(404).json({ message: 'Product not found' });
     }
+
+    console.log('✅ Product updated in database:', product._id);
+
+    // Populate createdBy and lastUpdatedBy for response
+    await product.populate('createdBy', 'fullName email');
+    await product.populate('lastUpdatedBy', 'fullName email');
+
+    console.log('✅ Product populated and ready to send');
 
     res.json({
       message: 'Product updated successfully',
@@ -216,25 +284,34 @@ router.put('/:id', authenticateToken, requireRole(['admin', 'super_admin']), asy
     });
 
   } catch (error) {
-    console.error('Update product error:', error);
-    res.status(500).json({ message: 'Failed to update product' });
+    console.error('❌ Update product error:', error);
+    console.error('📋 Error details:', error.message);
+    console.error('🔍 Error stack:', error.stack);
+    
+    res.status(500).json({ 
+      message: 'Failed to update product',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
 // @route   DELETE /api/products/:id
 // @desc    Delete product (soft delete)
 // @access  Private (Admin/Super Admin)
-router.delete('/:id', authenticateToken, requireRole(['admin', 'super_admin']), async (req, res) => {
+// @route   DELETE /api/products/:id
+// @desc    Delete product (Super Admin only)
+// @access  Private (Super Admin only)
+router.delete('/:id', authenticateToken, requireRole(['super_admin']), async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false, lastUpdatedBy: req.user._id },
-      { new: true }
-    );
+    const product = await Product.findById(req.params.id);
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
+
+    // Actually delete the product from database
+    await Product.findByIdAndDelete(req.params.id);
 
     res.json({ message: 'Product deleted successfully' });
 
@@ -271,12 +348,13 @@ router.post('/:id/toggle-featured', authenticateToken, requireRole(['admin', 'su
 });
 
 // @route   GET /api/products/admin/all
-// @desc    Get all products for admin (including inactive)
-// @access  Private (Admin/Super Admin)
-router.get('/admin/all', authenticateToken, requireRole(['admin', 'super_admin']), validatePagination, async (req, res) => {
+// @desc    Get all products for super admin (including inactive)
+// @access  Private (Super Admin only)
+router.get('/admin/all', authenticateToken, requireRole(['super_admin']), async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    // Allow higher limit for admin (up to 1000)
+    const limit = Math.min(parseInt(req.query.limit) || 20, 1000);
     const skip = (page - 1) * limit;
     
     const { category, featured, isActive, q } = req.query;

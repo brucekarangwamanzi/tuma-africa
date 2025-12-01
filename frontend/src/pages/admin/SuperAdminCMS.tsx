@@ -1321,8 +1321,8 @@ const SuperAdminCMS: React.FC = () => {
                 </div>
               )}
 
-              {/* Other tabs content */}
-              {!['hero', 'advertisements', 'products', 'company', 'theme', 'social', 'features'].includes(activeTab) && (
+              {/* Other tabs content - Note: product-management is handled above */}
+              {!['hero', 'advertisements', 'products', 'product-management', 'company', 'theme', 'social', 'features'].includes(activeTab) && (
                 <div className="bg-white rounded-lg shadow-soft p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-6">
                     {tabs.find(tab => tab.id === activeTab)?.label}

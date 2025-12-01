@@ -56,8 +56,8 @@ class ChatbotService {
 
     // Payment
     'payment': {
-      message: 'We accept multiple payment methods:\n\n💳 Credit/Debit Cards\n🏦 Bank Transfer\n📱 Mobile Money\n💰 TumaPay (Our payment platform)\n\nAll transactions are secure and encrypted.',
-      suggestions: ['Payment methods', 'TumaPay info', 'Talk to human']
+      message: 'We accept multiple payment methods:\n\n💳 Credit/Debit Cards\n🏦 Bank Transfer\n📱 Mobile Money\n\nAll transactions are secure and encrypted.',
+      suggestions: ['Payment methods', 'Talk to human']
     },
 
     // Support

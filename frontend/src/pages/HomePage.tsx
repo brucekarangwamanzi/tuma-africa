@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Link2, ArrowRight, Image, UploadCloud, Send, Package, Inbox, UserCircle, Settings, PlusCircle, Check, ShoppingCart, Archive, Truck, Home, Menu, Briefcase, Globe, FileCheck } from 'lucide-react';
+import { Link2, ArrowRight, Image, UploadCloud, Send, Package, Inbox, UserCircle, Settings, PlusCircle, Check, ShoppingCart, Archive, Truck, Home, Menu, Briefcase, Globe, FileCheck, Car } from 'lucide-react';
 import AdvertisementBanner from '../components/ui/AdvertisementBanner';
 import FeaturedProducts from '../components/home/FeaturedProducts';
 
@@ -156,18 +156,30 @@ const HomePage: React.FC = () => {
             <h2 className="text-3xl font-bold tracking-tight text-slate-900">Partners</h2>
           </div>
 
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="card-anim bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4 transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1" style={{animationDelay: '0.1s'}}>
-              <div className="flex-shrink-0 bg-slate-100 text-slate-600 w-12 h-12 rounded-lg flex items-center justify-center">
-                <Briefcase className="w-6 h-6" />
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Fast Lane Clearing - Clickable Partner Card */}
+            <a
+              href="https://www.africalinkcargo.com/fast-lane-clearing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="card-anim bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4 transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1 cursor-pointer group"
+              style={{animationDelay: '0.1s'}}
+            >
+              <div className="flex-shrink-0 bg-gradient-to-br from-green-500 to-green-600 text-white w-12 h-12 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                <FileCheck className="w-6 h-6" />
               </div>
-              <div>
-                <h3 className="text-xl font-semibold text-slate-800">TumaPay</h3>
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xl font-semibold text-slate-800 group-hover:text-primary-600 transition-colors">
+                    Fast Lane Clearing
+                  </h3>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-primary-600 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                </div>
                 <p className="text-sm text-slate-500 mt-1">
-                  Secure, low-fee cross-border payments. Making it easier to pay suppliers and manage your finances.
+                  Your expert partner for navigating Rwanda's tax & import landscape with unmatched speed and efficiency. Seamless clearance, swift delivery.
                 </p>
               </div>
-            </div>
+            </a>
 
             {/* Africa Link Cargo - Clickable Partner Card */}
             <a
@@ -192,6 +204,19 @@ const HomePage: React.FC = () => {
                 </p>
               </div>
             </a>
+
+            {/* Green Road Motors - Partner Card */}
+            <div className="card-anim bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4 transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1" style={{animationDelay: '0.3s'}}>
+              <div className="flex-shrink-0 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white w-12 h-12 rounded-lg flex items-center justify-center">
+                <Car className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-semibold text-slate-800">Green Road Motors</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Your trusted automotive partner providing quality vehicles and reliable transportation solutions.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
