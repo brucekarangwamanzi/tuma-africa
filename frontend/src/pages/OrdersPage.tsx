@@ -399,47 +399,91 @@ const OrdersPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {orders.map((order) => (
                 <Link
                   key={order._id}
                   to={`/orders/${order._id}`}
-                  className="block bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 active:scale-[0.98] touch-manipulation"
+                  className="block bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 flex flex-col"
                 >
-                  <div className="p-4 sm:p-5">
-                    {/* Mobile-Optimized Order Card */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        {/* Product Name - Prominent */}
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                          {order.productName}
-                        </h3>
-                        
-                        {/* Order Number */}
-                        <p className="text-xs sm:text-sm text-gray-500 mb-1">
-                          Order #{order.orderId}
+                  <div className="p-4 flex-1 flex flex-col">
+                    {/* Header */}
+                    <div className="mb-3">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="p-1.5 bg-blue-100 rounded-lg">
+                          <Package className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <p className="text-xs text-gray-500 truncate">
+                          #{order.orderId}
                         </p>
-                        
-                        {/* Date and Price Row */}
-                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                          <p className="text-xs sm:text-sm text-gray-600">
-                            {new Date(order.createdAt).toLocaleDateString('en-US', { 
-                              month: 'numeric', 
-                              day: 'numeric', 
-                              year: 'numeric' 
-                            })}
-                          </p>
-                          <p className="text-base sm:text-lg font-bold text-gray-900">
-                            ${(order.finalAmount || 0).toLocaleString()}
-                          </p>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-400">
+                          {new Date(order.createdAt).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </p>
+                        <div className="flex-shrink-0">
+                          {getStatusBadge(order.status)}
                         </div>
                       </div>
+                    </div>
+                    
+                    {/* Product Name */}
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3 line-clamp-2 flex-1" title={order.productName}>
+                      {order.productName}
+                    </h3>
+                    
+                    {/* Order Details Grid */}
+                    <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+                      <div className="p-2 bg-gray-50 rounded-lg">
+                        <p className="text-gray-500 text-xs">Quantity</p>
+                        <p className="font-semibold text-gray-900">{order.quantity}</p>
+                      </div>
                       
-                      {/* Status Badge - Right Side */}
-                      <div className="flex-shrink-0">
-                        {getStatusBadge(order.status)}
+                      <div className="p-2 bg-gray-50 rounded-lg">
+                        <p className="text-gray-500 text-xs">Unit Price</p>
+                        <p className="font-semibold text-gray-900">${(order.unitPrice || 0).toLocaleString()}</p>
+                      </div>
+                      
+                      <div className="p-2 bg-gray-50 rounded-lg">
+                        <p className="text-gray-500 text-xs">Shipping</p>
+                        <p className="font-semibold text-gray-900">${(order.shippingCost || 0).toLocaleString()}</p>
+                      </div>
+                      
+                      <div className="p-2 bg-green-50 rounded-lg">
+                        <p className="text-green-600 text-xs font-medium">Total</p>
+                        <p className="font-bold text-green-700">${(order.finalAmount || 0).toLocaleString()}</p>
                       </div>
                     </div>
+                    
+                    {/* Priority Badge */}
+                    {order.priority && (
+                      <div className="mb-3">
+                        {getPriorityBadge(order.priority)}
+                      </div>
+                    )}
+                    
+                    {/* Tracking Info */}
+                    {order.trackingInfo?.trackingNumber && (
+                      <div className="mt-auto p-2 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="w-3 h-3 text-blue-600 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-blue-900 truncate">
+                              {order.trackingInfo.trackingNumber}
+                            </p>
+                            {order.trackingInfo.carrier && (
+                              <p className="text-xs text-blue-700 truncate">
+                                {order.trackingInfo.carrier}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Link>
               ))}

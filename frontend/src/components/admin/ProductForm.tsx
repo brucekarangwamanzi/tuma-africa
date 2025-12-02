@@ -5,17 +5,14 @@ import {
   ArrowLeft,
   Save,
   Plus,
-  Minus,
-  Upload,
   X,
   AlertCircle,
   Image as ImageIcon,
   Link as LinkIcon,
   Tag,
   DollarSign,
-  Truck,
-  Star,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import { useProductStore } from "../../store/productStore";
 
 interface ProductFormProps {
@@ -35,6 +32,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
     fetchCategories,
     clearCurrentProduct,
   } = useProductStore();
+
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -82,7 +82,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
       freeShippingThreshold: 0,
     },
     featured: false,
-    isActive: true,
+    isActive: true, // Products are visible to all users by default
   });
 
   const [newTag, setNewTag] = useState("");
@@ -154,6 +154,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
         isActive: currentProduct.isActive,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, currentProduct]);
 
   const handleInputChange = (
@@ -230,6 +231,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRemoveColor = (colorToRemove: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -242,6 +244,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
     }));
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleAddSize = () => {
     if (
       newSize.trim() &&
@@ -258,6 +261,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRemoveSize = (sizeToRemove: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -287,16 +291,122 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
+    setSubmitSuccess(false);
+
+    // Validate required fields
+    if (!formData.name.trim()) {
+      setSubmitError('Product name is required');
+      return;
+    }
+    if (!formData.description.trim()) {
+      setSubmitError('Product description is required');
+      return;
+    }
+    if (formData.price <= 0) {
+      setSubmitError('Product price must be greater than 0');
+      return;
+    }
+    if (!formData.imageUrl.trim()) {
+      setSubmitError('Product image URL is required');
+      return;
+    }
+    if (!formData.category.trim()) {
+      setSubmitError('Product category is required');
+      return;
+    }
 
     try {
-      if (mode === "create") {
-        await createProduct(formData);
+      console.log('🚀 Submitting product form...');
+      console.log('📦 Mode:', mode);
+      console.log('📋 Form data:', formData);
+
+        if (mode === "create") {
+          console.log('➕ Creating new product...');
+          console.log('📋 Form data being sent:', JSON.stringify(formData, null, 2));
+          
+          // Note: Product will be visible to all users by default (status: published, isActive: true)
+          try {
+            const newProduct = await createProduct(formData);
+            
+            // Additional success logging in form component
+            console.log('🎉 Form: Product creation completed!');
+            console.log('📋 Product details:', {
+              id: newProduct._id,
+              name: newProduct.name,
+              price: newProduct.price,
+              category: newProduct.category,
+              status: newProduct.status || (newProduct.isActive ? 'published' : 'draft')
+            });
+            
+            setSubmitSuccess(true);
+            
+            // Show alert message with product details
+            alert(
+              `✅ Product Created Successfully!\n\n` +
+              `📦 Product Name: ${newProduct.name}\n` +
+              `💰 Price: ${newProduct.price} ${newProduct.currency || 'USD'}\n` +
+              `📂 Category: ${newProduct.category}\n` +
+              `✅ Status: ${newProduct.status || (newProduct.isActive ? 'Published' : 'Draft')}\n` +
+              `⭐ Featured: ${newProduct.featured ? 'Yes' : 'No'}\n` +
+              `👁️  Visible to Users: ${newProduct.isActive ? 'Yes' : 'No'}\n\n` +
+              `🔄 You will be redirected to the products list in a moment...`
+            );
+            
+            // Also show toast notification
+            toast.success(
+              `✅ Product "${newProduct.name}" created successfully!\n🔄 Redirecting to products list...`,
+              {
+                autoClose: 2000,
+                position: 'top-right'
+              }
+            );
+            
+            // Navigate after a short delay to show success message
+            setTimeout(() => {
+              console.log('🔄 Navigating to products list page...');
+              console.log('📍 Route: /admin/products');
+              navigate("/admin/products", { replace: true });
+            }, 1500);
+          } catch (createError: any) {
+            console.error('❌ Error in createProduct call:', createError);
+            // Error is already handled in createProduct, just re-throw
+            throw createError;
+          }
       } else if (mode === "edit" && productId) {
+        console.log('✏️ Updating product...');
         await updateProduct(productId, formData);
+        console.log('✅ Product updated');
+        
+        setSubmitSuccess(true);
+        toast.success('Product updated successfully!', {
+          autoClose: 2000,
+          onClose: () => {
+            navigate("/admin/products");
+          }
+        });
+        
+        setTimeout(() => {
+          navigate("/admin/products");
+        }, 1500);
       }
-      navigate("/admin/products");
-    } catch (error) {
-      // Error handling is done in the store
+    } catch (error: any) {
+      console.error('❌ Form submission error:', error);
+      
+      // Get error message from store or error object
+      const errorMessage = error?.message || 
+                          error?.response?.data?.message || 
+                          'Failed to save product. Please try again.';
+      
+      setSubmitError(errorMessage);
+      
+      // Show error toast
+      toast.error(errorMessage, {
+        autoClose: 5000
+      });
+      
+      // Scroll to top to show error
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -329,6 +439,33 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
             </div>
           </div>
         </div>
+
+        {/* Error/Success Messages */}
+        {submitError && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
+              <div>
+                <h3 className="text-sm font-semibold text-red-800">Error</h3>
+                <p className="text-sm text-red-700 mt-1">{submitError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {submitSuccess && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
+            <div className="flex items-center">
+              <div className="w-5 h-5 text-green-600 mr-3">✓</div>
+              <div>
+                <h3 className="text-sm font-semibold text-green-800">Success!</h3>
+                <p className="text-sm text-green-700 mt-1">
+                  {mode === "create" ? "Product created successfully!" : "Product updated successfully!"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -615,18 +752,46 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
                 </h3>
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-gray-700">
-                      Active
-                    </label>
-                    <input
-                      type="checkbox"
-                      name="isActive"
-                      checked={formData.isActive}
-                      onChange={handleInputChange}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                  </div>
+                  {mode === 'create' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-blue-800">
+                            Product Visibility
+                          </h3>
+                          <div className="mt-2 text-sm text-blue-700">
+                            <p>
+                              ✅ <strong>New products are visible to all users by default.</strong>
+                            </p>
+                            <p className="mt-1">
+                              After creation, you can change the visibility status from the product management page.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {mode === 'edit' && (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Product Status</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {formData.isActive ? '✅ Published (Visible to all users)' : '📝 Draft (Hidden from users)'}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        💡 To change visibility, use the status toggle button on the product management page.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-medium text-gray-700">

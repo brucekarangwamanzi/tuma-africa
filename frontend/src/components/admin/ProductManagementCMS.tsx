@@ -14,6 +14,7 @@ interface Product {
   imageUrl: string;
   images?: string[];
   category: string;
+  status?: 'draft' | 'published';
   isActive: boolean;
   featured: boolean;
 }
@@ -44,6 +45,7 @@ const ProductManagementCMS: React.FC = () => {
     imageUrl: '',
     images: [] as string[],
     category: '',
+    status: 'draft' as 'draft' | 'published',
     isActive: true,
     featured: false,
   });
@@ -244,21 +246,36 @@ const ProductManagementCMS: React.FC = () => {
         }
         
         // Use first image as imageUrl if images array exists, otherwise use imageUrl
-        const primaryImageUrl = formData.images.length > 0 
-          ? formData.images[0] 
-          : formData.imageUrl.trim();
+        let primaryImageUrl = '';
+        if (formData.images.length > 0) {
+          primaryImageUrl = formData.images[0];
+        } else if (formData.imageUrl && formData.imageUrl.trim()) {
+          primaryImageUrl = formData.imageUrl.trim();
+        }
         
-        const updatePayload = {
+        // Ensure we have at least one image
+        if (!primaryImageUrl) {
+          toast.error('Please upload at least one product image or provide an image URL');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const updatePayload: any = {
           name: formData.name.trim(),
           description: formData.description.trim(),
           price: parseFloat(priceValue.toString()), // Ensure it's a float number
           currency: formData.currency || 'USD',
           imageUrl: primaryImageUrl,
-          images: formData.images.length > 0 ? formData.images : undefined,
           category: formData.category.trim(),
-          isActive: formData.isActive !== undefined ? formData.isActive : true,
+          status: formData.status || 'draft',
+          isActive: formData.status === 'published' || formData.isActive,
           featured: formData.featured || false
         };
+        
+        // Only include images array if it has items
+        if (formData.images.length > 0) {
+          updatePayload.images = formData.images;
+        }
         
         console.log('🔄 Updating product with payload:', updatePayload);
         console.log('📦 Product ID:', editingProduct._id);
@@ -297,17 +314,20 @@ const ProductManagementCMS: React.FC = () => {
         toast.success('Product updated successfully!');
         
         // Show info about product visibility
-        if (updatePayload.isActive) {
+        if (updatePayload.status === 'published') {
           toast.success(
-            `✅ Product "${updatePayload.name}" is now visible on the /products page!`, 
+            `✅ Product "${updatePayload.name}" is now published and visible on the /products page!`, 
             { autoClose: 4000 }
           );
         } else {
           toast.warning(
-            `⚠️ Product "${updatePayload.name}" is hidden from the /products page (isActive: false)`, 
+            `⚠️ Product "${updatePayload.name}" is saved as draft and hidden from the /products page`, 
             { autoClose: 4000 }
           );
         }
+        
+        // Update product in list immediately (optimistic update)
+        setProducts(prev => prev.map(p => p._id === updatedProduct._id ? updatedProduct : p));
         
         // Reset form
         setFormData({
@@ -318,10 +338,23 @@ const ProductManagementCMS: React.FC = () => {
           imageUrl: '',
           images: [],
           category: '',
-          isActive: true,
+          status: 'draft',
+          isActive: false,
           featured: false,
         });
         setEditingProduct(null);
+        
+        // Close modal
+        handleCloseModal();
+        
+        // Refresh products list to ensure we have latest data from server
+        setTimeout(async () => {
+          try {
+            await fetchProducts();
+          } catch (error) {
+            console.error('Error refreshing products list:', error);
+          }
+        }, 500);
       } else {
         // Create new product - ensure all required fields are set
         const priceValue = typeof formData.price === 'string' ? parseFloat(formData.price) : Number(formData.price);
@@ -334,21 +367,36 @@ const ProductManagementCMS: React.FC = () => {
         }
         
         // Use first image as imageUrl if images array exists, otherwise use imageUrl
-        const primaryImageUrl = formData.images.length > 0 
-          ? formData.images[0] 
-          : formData.imageUrl.trim();
+        let primaryImageUrl = '';
+        if (formData.images.length > 0) {
+          primaryImageUrl = formData.images[0];
+        } else if (formData.imageUrl && formData.imageUrl.trim()) {
+          primaryImageUrl = formData.imageUrl.trim();
+        }
         
-        const productPayload = {
+        // Ensure we have at least one image
+        if (!primaryImageUrl) {
+          toast.error('Please upload at least one product image or provide an image URL');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const productPayload: any = {
           name: formData.name.trim(),
           description: formData.description.trim(),
           price: parseFloat(priceValue.toString()), // Ensure it's a float number
           currency: formData.currency || 'USD',
           imageUrl: primaryImageUrl,
-          images: formData.images.length > 0 ? formData.images : undefined,
           category: formData.category.trim(),
-          isActive: formData.isActive !== undefined ? formData.isActive : true,
+          status: formData.status || 'draft',
+          isActive: formData.status === 'published' || formData.isActive,
           featured: formData.featured || false
         };
+        
+        // Only include images array if it has items
+        if (formData.images.length > 0) {
+          productPayload.images = formData.images;
+        }
         
         console.log('🚀 Creating product with payload:', productPayload);
         console.log('👤 User role:', user?.role);
@@ -368,8 +416,9 @@ const ProductManagementCMS: React.FC = () => {
           return;
         }
         
-        console.log('📡 Making POST request to /products');
+        console.log('📡 Making POST request to /api/products');
         console.log('📦 Payload:', JSON.stringify(productPayload, null, 2));
+        console.log('🔗 Full URL will be:', axios.defaults.baseURL + '/products');
         
         const response = await axios.post('/products', productPayload, {
           headers: {
@@ -398,24 +447,23 @@ const ProductManagementCMS: React.FC = () => {
         
         console.log('✅ Product created successfully:', newProduct);
         
-        // Add product to list immediately (at the beginning)
-        setProducts(prev => [newProduct, ...prev]);
+        // Show success message first
         toast.success('Product created successfully!');
         
         // Show info about product visibility
-        if (productPayload.isActive) {
+        if (productPayload.status === 'published') {
           toast.success(
-            `✅ Product "${productPayload.name}" is now visible on the /products page!`, 
+            `✅ Product "${productPayload.name}" is now published and visible on the /products page!`, 
             { autoClose: 4000 }
           );
         } else {
           toast.warning(
-            `⚠️ Product "${productPayload.name}" is hidden from the /products page (isActive: false)`, 
+            `⚠️ Product "${productPayload.name}" is saved as draft and hidden from the /products page`, 
             { autoClose: 4000 }
           );
         }
         
-        // Reset form
+        // Reset form immediately
         setFormData({
           name: '',
           description: '',
@@ -424,15 +472,39 @@ const ProductManagementCMS: React.FC = () => {
           imageUrl: '',
           images: [],
           category: '',
-          isActive: true,
+          status: 'draft',
+          isActive: false,
           featured: false,
         });
         setEditingProduct(null);
+        
+        // Clear search query so new product is visible
+        setSearchQuery('');
+        
+        // Close modal first
+        handleCloseModal();
+        
+        // Add product to list immediately (optimistic update)
+        setProducts(prev => {
+          // Check if product already exists (avoid duplicates)
+          const exists = prev.some(p => p._id === newProduct._id);
+          if (exists) {
+            return prev.map(p => p._id === newProduct._id ? newProduct : p);
+          }
+          return [newProduct, ...prev];
+        });
+        
+        // Refresh products list to ensure we have latest data from server
+        // Do this after a short delay to allow UI to update
+        setTimeout(async () => {
+          try {
+            await fetchProducts();
+          } catch (error) {
+            console.error('Error refreshing products list:', error);
+            // Don't show error to user, we already have the product in the list
+          }
+        }, 500);
       }
-
-      // Refresh products list to ensure we have latest data
-      await fetchProducts();
-      handleCloseModal();
     } catch (error: any) {
       console.error('❌ Failed to save product:', error);
       console.error('📋 Error response:', error.response?.data);
@@ -449,21 +521,34 @@ const ProductManagementCMS: React.FC = () => {
         if (error.response.status === 401 || error.response.status === 403) {
           errorMessage = 'Access denied. Please ensure you are logged in as a super admin.';
         } else if (error.response.status === 400) {
-          // Validation errors
-          if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
-            const validationErrors = error.response.data.errors.map((err: any) => {
-              return `${err.field || 'Field'}: ${err.message}`;
-            }).join(', ');
-            errorMessage = `Validation errors: ${validationErrors}`;
-          } else if (error.response.data.message) {
-            errorMessage = `Validation error: ${error.response.data.message}`;
-          } else if (error.response.data.error) {
-            errorMessage = `Error: ${error.response.data.error}`;
+          // Validation errors - show detailed list
+          const errorData = error.response.data;
+          if (errorData.errors && Array.isArray(errorData.errors)) {
+            const errorList = errorData.errors.map((err: any) => 
+              `• ${err.field || 'Field'}: ${err.message}`
+            ).join('\n');
+            errorMessage = `Validation Failed:\n${errorList}`;
+            console.error('📋 Validation Errors:', errorData.errors);
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+            if (errorData.error) {
+              console.error('📋 Error Details:', errorData.error);
+            }
+          } else if (errorData.error) {
+            errorMessage = `Error: ${errorData.error}`;
           }
         } else if (error.response.status === 500) {
           errorMessage = error.response.data?.message || 'Server error. Please try again later.';
-          if (error.response.data?.error && process.env.NODE_ENV === 'development') {
-            errorMessage += ` (${error.response.data.error})`;
+          const errorData = error.response.data;
+          if (errorData?.error) {
+            console.error('❌ Server Error:', errorData.error);
+            errorMessage += `\n\nError: ${errorData.error}`;
+          }
+          if (errorData?.errorName) {
+            console.error('📋 Error Type:', errorData.errorName);
+          }
+          if (errorData?.details && process.env.NODE_ENV === 'development') {
+            console.error('📋 Error Stack:', errorData.details);
           }
         } else if (error.response.data?.message) {
           errorMessage = error.response.data.message;
@@ -473,11 +558,27 @@ const ProductManagementCMS: React.FC = () => {
       } else if (error.request) {
         // Request made but no response
         errorMessage = 'No response from server. Please check your connection and ensure the backend is running.';
+        console.error('❌ Network Error: No response received');
       } else if (error.message) {
         errorMessage = `Error: ${error.message}`;
       }
       
-      toast.error(errorMessage, { autoClose: 5000 });
+      // Show detailed error in console
+      console.error('🚨 PRODUCT CREATION ERROR SUMMARY:');
+      console.error('Message:', errorMessage);
+      console.error('Status:', error.response?.status);
+      console.error('Response Data:', error.response?.data);
+      console.error('Request Config:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data
+      });
+      
+      // Show error toast with longer duration for detailed errors
+      toast.error(errorMessage, { 
+        autoClose: error.response?.status === 400 ? 8000 : 6000,
+        style: { whiteSpace: 'pre-line' }
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -521,6 +622,8 @@ const ProductManagementCMS: React.FC = () => {
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
+    // Determine status from isActive or use product.status
+    const status = product.status || (product.isActive ? 'published' : 'draft');
     setFormData({
       name: product.name,
       description: product.description,
@@ -529,6 +632,7 @@ const ProductManagementCMS: React.FC = () => {
       imageUrl: product.imageUrl,
       images: product.images || [],
       category: product.category,
+      status: status,
       isActive: product.isActive,
       featured: product.featured,
     });
@@ -546,7 +650,8 @@ const ProductManagementCMS: React.FC = () => {
       imageUrl: '',
       images: [],
       category: '',
-      isActive: true,
+      status: 'draft',
+      isActive: false,
       featured: false,
     });
   };
@@ -627,9 +732,14 @@ const ProductManagementCMS: React.FC = () => {
                       Featured
                     </span>
                   )}
-                  {!product.isActive && (
-                    <span className="px-2 py-1 bg-red-500 text-white text-xs rounded">
-                      Inactive
+                  {(product.status === 'draft' || !product.isActive) && (
+                    <span className="px-2 py-1 bg-gray-500 text-white text-xs rounded">
+                      Draft
+                    </span>
+                  )}
+                  {product.status === 'published' && product.isActive && (
+                    <span className="px-2 py-1 bg-green-500 text-white text-xs rounded">
+                      Published
                     </span>
                   )}
                 </div>
@@ -643,13 +753,13 @@ const ProductManagementCMS: React.FC = () => {
                 <span className="inline-block px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
                   {product.category}
                 </span>
-                {product.isActive ? (
+                {product.status === 'published' || product.isActive ? (
                   <span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
-                    Visible
+                    Published
                   </span>
                 ) : (
-                  <span className="inline-block px-2 py-1 bg-red-100 text-red-700 text-xs rounded">
-                    Hidden
+                  <span className="inline-block px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                    Draft
                   </span>
                 )}
                 {product.featured && (
@@ -883,25 +993,36 @@ const ProductManagementCMS: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status *
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => {
+                      const newStatus = e.target.value as 'draft' | 'published';
+                      setFormData({ 
+                        ...formData, 
+                        status: newStatus,
+                        isActive: newStatus === 'published'
+                      });
+                    }}
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    required
+                  >
+                    <option value="draft">Draft (Hidden from public)</option>
+                    <option value="published">Published (Visible on Products Page)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {formData.status === 'published' 
+                      ? '✅ This product will appear on the /products page for all users'
+                      : '⚠️ This product will be hidden from the /products page (Draft)'}
+                  </p>
+                </div>
+
                 {/* Checkboxes */}
                 <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.isActive}
-                      onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">
-                      <strong>Visible on Products Page</strong>
-                    </span>
-                  </label>
-                  <p className="text-xs text-gray-500 ml-6">
-                    {formData.isActive 
-                      ? '✅ This product will appear on the /products page for all users'
-                      : '⚠️ This product will be hidden from the /products page'}
-                  </p>
-
                   <label className="flex items-center mt-4">
                     <input
                       type="checkbox"

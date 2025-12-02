@@ -54,6 +54,42 @@ type AuthStore = AuthState & AuthActions;
 // Configure axios defaults
 axios.defaults.baseURL = process.env.REACT_APP_API_URL || '/api';
 
+// Axios request interceptor for logging
+axios.interceptors.request.use(
+  (config) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📤 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+      if (config.data && !config.url?.includes('/auth/login') && !config.url?.includes('/auth/register')) {
+        console.log('📦 Request Data:', config.data);
+      }
+    }
+    return config;
+  },
+  (error) => {
+    console.error('❌ Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Axios response interceptor for logging
+axios.interceptors.response.use(
+  (response) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url} - Status: ${response.status}`);
+    }
+    return response;
+  },
+  (error) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`❌ API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url} - Status: ${error.response?.status || 'Network Error'}`);
+      if (error.response?.data) {
+        console.error('📋 Error Details:', error.response.data);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({

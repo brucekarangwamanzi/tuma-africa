@@ -115,6 +115,11 @@ const productSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  status: {
+    type: String,
+    enum: ['draft', 'published'],
+    default: 'draft'
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -148,5 +153,18 @@ productSchema.virtual('discountPercentage').get(function() {
 
 // Ensure virtual fields are serialized
 productSchema.set('toJSON', { virtuals: true });
+
+// Pre-save hook to ensure isActive always matches status
+productSchema.pre('save', function(next) {
+  // If status is set, ensure isActive matches it
+  if (this.status) {
+    this.isActive = this.status === 'published';
+  }
+  // If isActive is set but status is not, derive status from isActive
+  else if (this.isActive !== undefined && !this.status) {
+    this.status = this.isActive ? 'published' : 'draft';
+  }
+  next();
+});
 
 module.exports = mongoose.model('Product', productSchema);

@@ -8,6 +8,56 @@ const { createOrderNotification } = require('../utils/notifications');
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /orders:
+ *   post:
+ *     summary: Create new order
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - productName
+ *               - quantity
+ *               - unitPrice
+ *             properties:
+ *               productName:
+ *                 type: string
+ *               productLink:
+ *                 type: string
+ *               quantity:
+ *                 type: number
+ *               unitPrice:
+ *                 type: number
+ *               shippingCost:
+ *                 type: number
+ *               priority:
+ *                 type: string
+ *                 enum: [low, normal, high, urgent]
+ *               freightType:
+ *                 type: string
+ *                 enum: [air, sea, land]
+ *               description:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Order created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 order:
+ *                   $ref: '#/components/schemas/Order'
+ */
 // @route   POST /api/orders
 // @desc    Create new order
 // @access  Private (User)
@@ -91,6 +141,53 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
   }
 });
 
+/**
+ * @swagger
+ * /orders:
+ *   get:
+ *     summary: Get orders (filtered by user role)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+ *       - in: query
+ *         name: priority
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Orders retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 orders:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Order'
+ *                 pagination:
+ *                   type: object
+ */
 // @route   GET /api/orders
 // @desc    Get orders (filtered by role)
 // @access  Private
@@ -152,6 +249,33 @@ router.get('/', authenticateToken, validatePagination, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /orders/{orderId}:
+ *   get:
+ *     summary: Get single order by ID
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 order:
+ *                   $ref: '#/components/schemas/Order'
+ *       404:
+ *         description: Order not found
+ */
 // @route   GET /api/orders/:orderId
 // @desc    Get single order
 // @access  Private
@@ -191,6 +315,38 @@ router.get('/:orderId', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /orders/{orderId}:
+ *   put:
+ *     summary: Update order (Admin/Super Admin only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Order updated successfully
+ *       404:
+ *         description: Order not found
+ */
 // @route   PUT /api/orders/:orderId
 // @desc    Update order
 // @access  Private (Admin/Super Admin)
@@ -363,6 +519,26 @@ router.put('/:orderId/status', authenticateToken, requireRole(['admin', 'super_a
   }
 });
 
+/**
+ * @swagger
+ * /orders/{orderId}:
+ *   delete:
+ *     summary: Cancel or delete order
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Order cancelled/deleted successfully
+ *       404:
+ *         description: Order not found
+ */
 // @route   DELETE /api/orders/:orderId
 // @desc    Cancel/Delete order
 // @access  Private

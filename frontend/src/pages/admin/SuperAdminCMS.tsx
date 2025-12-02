@@ -165,9 +165,13 @@ const SuperAdminCMS: React.FC = () => {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-              {/* Hero Section */}
-              {activeTab === 'hero' && (
+            {/* Product Management is separate - no form wrapper */}
+            {activeTab === 'product-management' ? (
+              <ProductManagementCMS />
+            ) : (
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+                {/* Hero Section */}
+                {activeTab === 'hero' && (
                 <div className="bg-white rounded-lg shadow-soft p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-6">Hero Section</h2>
                   
@@ -486,11 +490,6 @@ const SuperAdminCMS: React.FC = () => {
                   setValue={setValue}
                   watchedValues={watchedValues}
                 />
-              )}
-
-              {/* Product Management Section */}
-              {activeTab === 'product-management' && (
-                <ProductManagementCMS />
               )}
 
               {/* Company Info Section */}
@@ -1332,7 +1331,8 @@ const SuperAdminCMS: React.FC = () => {
                   </p>
                 </div>
               )}
-            </form>
+              </form>
+            )}
           </div>
         </div>
       </div>

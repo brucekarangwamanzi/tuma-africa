@@ -85,15 +85,33 @@ const ProductDetailPage: React.FC = () => {
     
     setIsLoading(true);
     try {
+      console.log('📦 Fetching product:', id);
       const response = await axios.get(`/products/${id}`);
+      console.log('✅ Product fetched:', response.data.product);
       setProduct(response.data.product);
     } catch (error: any) {
-      console.error('Failed to fetch product:', error);
+      console.error('❌ Failed to fetch product:', error);
+      console.error('   Status:', error.response?.status);
+      console.error('   Message:', error.response?.data?.message);
+      console.error('   Product ID:', id);
+      
       if (error.response?.status === 404) {
-        toast.error('Product not found');
-        navigate('/products');
+        const errorMessage = error.response?.data?.message || 'Product not found';
+        const reason = error.response?.data?.reason;
+        
+        toast.error(
+          reason 
+            ? `${errorMessage}. ${reason}` 
+            : errorMessage,
+          { autoClose: 5000 }
+        );
+        
+        // Redirect after showing error
+        setTimeout(() => {
+          navigate('/products');
+        }, 2000);
       } else {
-        toast.error('Failed to load product details');
+        toast.error('Failed to load product details. Please try again.');
       }
     } finally {
       setIsLoading(false);

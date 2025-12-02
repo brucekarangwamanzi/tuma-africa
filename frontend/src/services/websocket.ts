@@ -39,12 +39,31 @@ class WebSocketService {
     }
 
     // Determine WebSocket URL based on environment
-    const wsUrl = process.env.REACT_APP_WS_URL || 
-                  (window.location.hostname === 'localhost' 
-                    ? 'http://localhost:5001' 
-                    : process.env.NODE_ENV === 'production'
-                      ? `https://${process.env.REACT_APP_API_URL?.replace('/api', '') || window.location.hostname}`
-                      : `http://${window.location.hostname}:5001`);
+    // Use the same hostname as the frontend, but port 5001 for backend
+    const getBackendUrl = () => {
+      if (process.env.REACT_APP_WS_URL) {
+        return process.env.REACT_APP_WS_URL;
+      }
+      
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+      
+      // If localhost, use localhost:5001
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:5001';
+      }
+      
+      // In production, use the API URL or current hostname
+      if (process.env.NODE_ENV === 'production') {
+        const apiUrl = process.env.REACT_APP_API_URL?.replace('/api', '') || hostname;
+        return `${protocol}//${apiUrl}`;
+      }
+      
+      // In development, use same hostname but port 5001
+      return `http://${hostname}:5001`;
+    };
+    
+    const wsUrl = getBackendUrl();
 
     // Only log in development
     if (process.env.NODE_ENV === 'development') {

@@ -67,6 +67,55 @@ if (process.env.USE_CLOUDINARY === 'true') {
   }
 }
 
+/**
+ * @swagger
+ * /upload/image:
+ *   post:
+ *     summary: Upload and optimize image
+ *     tags: [Upload]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - image
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *     parameters:
+ *       - in: query
+ *         name: maxWidth
+ *         schema:
+ *           type: integer
+ *           default: 800
+ *       - in: query
+ *         name: maxHeight
+ *         schema:
+ *           type: integer
+ *           default: 600
+ *       - in: query
+ *         name: quality
+ *         schema:
+ *           type: integer
+ *           default: 80
+ *     responses:
+ *       200:
+ *         description: Image uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 imageUrl:
+ *                   type: string
+ */
 // @route   POST /api/upload/image
 // @desc    Upload and optimize image
 // @access  Private
@@ -249,6 +298,32 @@ router.post('/document', authenticateToken, upload.single('document'), async (re
   }
 });
 
+/**
+ * @swagger
+ * /upload/multiple:
+ *   post:
+ *     summary: Upload multiple files
+ *     tags: [Upload]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - files
+ *             properties:
+ *               files:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *     responses:
+ *       200:
+ *         description: Files uploaded successfully
+ */
 // @route   POST /api/upload/multiple
 // @desc    Upload multiple files
 // @access  Private

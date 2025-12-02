@@ -25,6 +25,91 @@ const generateTokens = (userId, role) => {
   return { accessToken, refreshToken };
 };
 
+/**
+ * @swagger
+ * /auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     description: Create a new user account. User will need to verify email and wait for admin approval.
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - fullName
+ *               - email
+ *               - phone
+ *               - password
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *                 description: User's full name
+ *                 example: John Doe
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User email address (must be unique)
+ *                 example: john@example.com
+ *               phone:
+ *                 type: string
+ *                 description: User phone number (must be unique)
+ *                 example: +1234567890
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: User password (min 6 characters, must contain uppercase, lowercase, and number)
+ *                 example: SecurePassword123!
+ *               currency:
+ *                 type: string
+ *                 enum: [USD, RWF, Yuan]
+ *                 description: Preferred currency
+ *                 default: USD
+ *                 example: USD
+ *           examples:
+ *             example1:
+ *               summary: Example registration
+ *               value:
+ *                 fullName: John Doe
+ *                 email: john@example.com
+ *                 phone: +1234567890
+ *                 password: SecurePassword123!
+ *                 currency: USD
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Registration successful! Please check your email to verify your account.
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *                 accessToken:
+ *                   type: string
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *                 refreshToken:
+ *                   type: string
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *       400:
+ *         description: Validation error or user already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               emailExists:
+ *                 value:
+ *                   message: Email already registered
+ *               phoneExists:
+ *                 value:
+ *                   message: Phone number already registered
+ */
 // @route   POST /api/auth/register
 // @desc    Register new user
 // @access  Public
@@ -139,6 +224,69 @@ router.post('/register', validateUserRegistration, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Login user
+ *     description: Authenticate user with email and password to receive access token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User email address
+ *                 example: john@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: User password
+ *                 example: SecurePassword123!
+ *           examples:
+ *             example1:
+ *               summary: Example login request
+ *               value:
+ *                 email: john@example.com
+ *                 password: SecurePassword123!
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Login successful
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *                 accessToken:
+ *                   type: string
+ *                   description: JWT access token (use this for Authorization header)
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *                 refreshToken:
+ *                   type: string
+ *                   description: JWT refresh token
+ *                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               message: Invalid email or password
+ */
 // @route   POST /api/auth/login
 // @desc    Login user
 // @access  Public
@@ -198,6 +346,40 @@ router.post('/login', validateUserLogin, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *       403:
+ *         description: Invalid refresh token
+ */
 // @route   POST /api/auth/refresh
 // @desc    Refresh access token
 // @access  Public
@@ -238,6 +420,34 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Logout user
+ *     description: |
+ *       Logout the current user and invalidate their refresh token.
+ *       
+ *       **Authentication Required:** This endpoint requires a valid JWT token.
+ *       Click the "Authorize" button at the top of the page and enter your token.
+ *       
+ *       **No Parameters:** This endpoint doesn't require any request body or parameters.
+ *       The user is identified from the JWT token in the Authorization header.
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *             example:
+ *               message: "Logout successful"
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ */
 // @route   POST /api/auth/logout
 // @desc    Logout user
 // @access  Private
@@ -256,6 +466,54 @@ router.post('/logout', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/me:
+ *   get:
+ *     summary: Get current authenticated user
+ *     description: |
+ *       Get the currently authenticated user's information.
+ *       
+ *       **Authentication Required:** This endpoint requires a valid JWT token.
+ *       Click the "Authorize" button at the top of the page and enter your token.
+ *       
+ *       **No Parameters:** This endpoint doesn't require any query or path parameters.
+ *       The user is identified from the JWT token in the Authorization header.
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User information retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *             examples:
+ *               example1:
+ *                 summary: Example response
+ *                 value:
+ *                   user:
+ *                     id: "507f1f77bcf86cd799439011"
+ *                     fullName: "John Doe"
+ *                     email: "john@example.com"
+ *                     phone: "+1234567890"
+ *                     role: "user"
+ *                     verified: true
+ *                     approved: true
+ *                     profileImage: "https://example.com/profile.jpg"
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               message: "Unauthorized"
+ */
 // @route   GET /api/auth/me
 // @desc    Get current user
 // @access  Private
@@ -287,6 +545,28 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Request password reset
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Password reset email sent (if email exists)
+ */
 // @route   POST /api/auth/forgot-password
 // @desc    Request password reset
 // @access  Public
@@ -330,6 +610,33 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     summary: Reset password with token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - newPassword
+ *             properties:
+ *               token:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       200:
+ *         description: Password reset successful
+ *       400:
+ *         description: Invalid or expired token
+ */
 // @route   POST /api/auth/reset-password
 // @desc    Reset password with token
 // @access  Public

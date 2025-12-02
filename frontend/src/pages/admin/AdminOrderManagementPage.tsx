@@ -427,154 +427,136 @@ const AdminOrderManagementPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            orders.map((order) => (
-              <div key={order._id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
-                <div className="p-6">
-                  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
-                    <div className="flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
-                        <div className="flex items-center space-x-3 mb-2 sm:mb-0">
-                          <div className="p-2 bg-blue-100 rounded-lg">
-                            <Package className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-bold text-gray-900">
-                              {order.orderId}
-                            </h3>
-                            <p className="text-sm text-gray-500">
-                              {new Date(order.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {orders.map((order) => (
+                <div key={order._id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 flex flex-col">
+                  <div className="p-4 flex-1">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <div className="p-1.5 bg-blue-100 rounded-lg">
+                          <Package className="w-4 h-4 text-blue-600" />
                         </div>
-                        
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-900 truncate max-w-[120px]">
+                            {order.orderId}
+                          </h3>
+                          <p className="text-xs text-gray-500">
+                            {new Date(order.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end space-y-1">
+                        {getStatusBadge(order.status)}
+                        {getPriorityBadge(order.priority)}
+                      </div>
+                    </div>
+                    
+                    {/* Customer Information */}
+                    {order.userId && (
+                      <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="flex items-center space-x-2">
-                          {getStatusBadge(order.status)}
-                          {getPriorityBadge(order.priority)}
-                        </div>
-                      </div>
-                      
-                      {/* Customer Information */}
-                      {order.userId && (
-                        <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                          <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                              <User className="w-4 h-4 text-blue-600" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">
-                                Customer
+                          <User className="w-3 h-3 text-blue-600 flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-gray-900 truncate">
+                              {order.userId.fullName || 'Unknown Customer'}
+                            </p>
+                            {order.userId.email && (
+                              <p className="text-xs text-gray-600 truncate">
+                                {order.userId.email}
                               </p>
-                              <p className="text-base font-bold text-gray-900">
-                                {order.userId.fullName || 'Unknown Customer'}
-                              </p>
-                              {order.userId.email && (
-                                <p className="text-sm text-gray-600 mt-1">
-                                  {order.userId.email}
-                                </p>
-                              )}
-                              {order.userId.phone && (
-                                <p className="text-sm text-gray-600">
-                                  {order.userId.phone}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="mb-4">
-                        <h4 className="font-semibold text-gray-900 mb-1">{order.productName}</h4>
-                        {order.description && (
-                          <p className="text-gray-600 text-sm">{order.description}</p>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                          <Package className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-gray-500">Quantity</p>
-                            <p className="font-semibold text-gray-900">{order.quantity}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                          <DollarSign className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-gray-500">Unit Price</p>
-                            <p className="font-semibold text-gray-900">${(order.unitPrice || 0).toLocaleString()}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                          <Truck className="w-4 h-4 text-gray-500" />
-                          <div>
-                            <p className="text-gray-500">Shipping</p>
-                            <p className="font-semibold text-gray-900">${(order.shippingCost || 0).toLocaleString()}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
-                          <DollarSign className="w-4 h-4 text-green-600" />
-                          <div>
-                            <p className="text-green-600">Total</p>
-                            <p className="font-bold text-green-700">${(order.finalAmount || 0).toLocaleString()}</p>
+                            )}
                           </div>
                         </div>
                       </div>
-                      
-                      {order.trackingInfo?.trackingNumber && (
-                        <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <div className="flex items-center space-x-3">
-                            <MapPin className="w-5 h-5 text-blue-600" />
-                            <div>
-                              <p className="font-medium text-blue-900">Tracking: {order.trackingInfo.trackingNumber}</p>
-                              <p className="text-sm text-blue-700">
-                                {order.trackingInfo.carrier} • Est. delivery: {order.trackingInfo.estimatedDelivery ? new Date(order.trackingInfo.estimatedDelivery).toLocaleDateString() : 'TBD'}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                    )}
+                    
+                    {/* Product Name */}
+                    <div className="mb-3">
+                      <h4 className="font-semibold text-sm text-gray-900 truncate" title={order.productName}>
+                        {order.productName}
+                      </h4>
+                      {order.description && (
+                        <p className="text-xs text-gray-600 line-clamp-2 mt-1">{order.description}</p>
                       )}
                     </div>
                     
-                    <div className="mt-6 xl:mt-0 xl:ml-8 flex flex-col gap-3">
-                      <div className="flex items-center space-x-2">
-                        <select
-                          value={order.status}
-                          onChange={(e) => handleStatusUpdate(order._id, e.target.value, order.orderId)}
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-medium"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="processing">Processing</option>
-                          <option value="shipped">Shipped</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
+                    {/* Order Details - 4 columns in card */}
+                    <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+                      <div className="p-2 bg-gray-50 rounded-lg">
+                        <p className="text-gray-500 text-xs">Qty</p>
+                        <p className="font-semibold text-gray-900">{order.quantity}</p>
                       </div>
                       
-                      <div className="flex space-x-2">
-                        <Link
-                          to={`/admin/orders/${order._id}`}
-                          className="flex-1 flex items-center justify-center px-4 py-2 text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
-                        </Link>
-                        
-                        <Link
-                          to={`/admin/orders/${order._id}/edit`}
-                          className="flex-1 flex items-center justify-center px-4 py-2 text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          Edit
-                        </Link>
+                      <div className="p-2 bg-gray-50 rounded-lg">
+                        <p className="text-gray-500 text-xs">Unit</p>
+                        <p className="font-semibold text-gray-900">${(order.unitPrice || 0).toLocaleString()}</p>
                       </div>
+                      
+                      <div className="p-2 bg-gray-50 rounded-lg">
+                        <p className="text-gray-500 text-xs">Ship</p>
+                        <p className="font-semibold text-gray-900">${(order.shippingCost || 0).toLocaleString()}</p>
+                      </div>
+                      
+                      <div className="p-2 bg-green-50 rounded-lg">
+                        <p className="text-green-600 text-xs font-medium">Total</p>
+                        <p className="font-bold text-green-700">${(order.finalAmount || 0).toLocaleString()}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Tracking Info */}
+                    {order.trackingInfo?.trackingNumber && (
+                      <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-start space-x-2">
+                          <MapPin className="w-3 h-3 text-blue-600 flex-shrink-0 mt-0.5" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-blue-900 truncate">
+                              {order.trackingInfo.trackingNumber}
+                            </p>
+                            <p className="text-xs text-blue-700 truncate">
+                              {order.trackingInfo.carrier}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Actions Footer */}
+                  <div className="p-4 pt-0 border-t border-gray-100 space-y-2">
+                    <select
+                      value={order.status}
+                      onChange={(e) => handleStatusUpdate(order._id, e.target.value, order.orderId)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs font-medium"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                    
+                    <div className="flex space-x-2">
+                      <Link
+                        to={`/admin/orders/${order._id}`}
+                        className="flex-1 flex items-center justify-center px-2 py-1.5 text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        View
+                      </Link>
+                      
+                      <Link
+                        to={`/admin/orders/${order._id}/edit`}
+                        className="flex-1 flex items-center justify-center px-2 py-1.5 text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
+                      >
+                        <Edit className="w-3 h-3 mr-1" />
+                        Edit
+                      </Link>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
 

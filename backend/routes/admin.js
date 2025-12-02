@@ -9,6 +9,25 @@ const { validateAdminSettings, validatePagination } = require('../middleware/val
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /admin/settings:
+ *   get:
+ *     summary: Get admin settings
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Admin settings
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 settings:
+ *                   type: object
+ */
 // @route   GET /api/admin/settings
 // @desc    Get admin settings
 // @access  Private (Admin/Super Admin)
@@ -70,6 +89,33 @@ router.post('/settings', authenticateToken, requireRole(['super_admin']), sensit
   }
 });
 
+/**
+ * @swagger
+ * /admin/dashboard:
+ *   get:
+ *     summary: Get admin dashboard data
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 userCount:
+ *                   type: integer
+ *                 orderCount:
+ *                   type: integer
+ *                 productCount:
+ *                   type: integer
+ *                 orderStats:
+ *                   type: array
+ *                 recentOrders:
+ *                   type: array
+ */
 // @route   GET /api/admin/dashboard
 // @desc    Get admin dashboard data
 // @access  Private (Admin/Super Admin)

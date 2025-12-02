@@ -11,15 +11,17 @@ import {
   Star,
   StarOff,
   RefreshCw,
-  TrendingUp,
   ShoppingCart,
   Users,
   Activity
 } from 'lucide-react';
 import { useProductStore } from '../../store/productStore';
+import { useAuthStore } from '../../store/authStore';
 import { formatDistanceToNow } from 'date-fns';
+import { EyeOff, Eye as EyeOn } from 'lucide-react';
 
 const ProductManagementPage: React.FC = () => {
+  const { user } = useAuthStore();
   const {
     products,
     stats,
@@ -29,6 +31,7 @@ const ProductManagementPage: React.FC = () => {
     fetchProducts,
     deleteProduct,
     toggleFeatured,
+    changeProductStatus,
     fetchCategories
   } = useProductStore();
 
@@ -41,6 +44,7 @@ const ProductManagementPage: React.FC = () => {
   useEffect(() => {
     loadProducts();
     fetchCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const loadProducts = async () => {
@@ -89,17 +93,30 @@ const ProductManagementPage: React.FC = () => {
     await toggleFeatured(productId);
   };
 
-  const getStatusBadge = (isActive: boolean) => {
+  const handleToggleStatus = async (productId: string, currentStatus: boolean) => {
+    const newStatus = currentStatus ? 'draft' : 'published';
+    await changeProductStatus(productId, newStatus);
+    // Refresh products list
+    loadProducts();
+  };
+
+  const getStatusBadge = (isActive: boolean, status?: 'draft' | 'published') => {
+    const displayStatus = status || (isActive ? 'published' : 'draft');
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        isActive 
+        displayStatus === 'published'
           ? 'bg-green-100 text-green-800' 
-          : 'bg-red-100 text-red-800'
+          : 'bg-gray-100 text-gray-800'
       }`}>
-        {isActive ? 'Active' : 'Inactive'}
+        {displayStatus === 'published' ? 'Published' : 'Draft'}
       </span>
     );
   };
+
+  // Check if user can edit products (Admin or Super Admin)
+  const canEditProducts = user && (user.role === 'admin' || user.role === 'super_admin');
+  // Check if user can change status (Admin or Super Admin)
+  const canChangeStatus = user && (user.role === 'admin' || user.role === 'super_admin');
 
   if (isLoading && !products.length) {
     return (
@@ -399,31 +416,50 @@ const ProductManagementPage: React.FC = () => {
                         <Eye className="w-4 h-4 mr-1" />
                         View
                       </Link>
-                      <Link
-                        to={`/admin/products/${product._id}/edit`}
-                        className="flex-1 flex items-center justify-center px-3 py-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-sm font-medium"
-                      >
-                        <Edit className="w-4 h-4 mr-1" />
-                        Edit
-                      </Link>
-                      <button
-                        onClick={() => handleToggleFeatured(product._id)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          product.featured
-                            ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100'
-                            : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
-                        }`}
-                        title={product.featured ? 'Remove from featured' : 'Add to featured'}
-                      >
-                        {product.featured ? <Star className="w-4 h-4" /> : <StarOff className="w-4 h-4" />}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product._id, product.name)}
-                        className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                        title="Delete product"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {canEditProducts && (
+                        <Link
+                          to={`/admin/products/${product._id}/edit`}
+                          className="flex-1 flex items-center justify-center px-3 py-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-sm font-medium"
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Edit
+                        </Link>
+                      )}
+                      {canChangeStatus && (
+                        <button
+                          onClick={() => handleToggleStatus(product._id, product.isActive)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            product.isActive
+                              ? 'text-gray-600 bg-gray-50 hover:bg-gray-100'
+                              : 'text-green-600 bg-green-50 hover:bg-green-100'
+                          }`}
+                          title={product.isActive ? 'Hide product (set to draft)' : 'Publish product (make visible)'}
+                        >
+                          {product.isActive ? <EyeOff className="w-4 h-4" /> : <EyeOn className="w-4 h-4" />}
+                        </button>
+                      )}
+                      {canEditProducts && (
+                        <button
+                          onClick={() => handleToggleFeatured(product._id)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            product.featured
+                              ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100'
+                              : 'text-gray-400 bg-gray-50 hover:bg-gray-100'
+                          }`}
+                          title={product.featured ? 'Remove from featured' : 'Add to featured'}
+                        >
+                          {product.featured ? <Star className="w-4 h-4" /> : <StarOff className="w-4 h-4" />}
+                        </button>
+                      )}
+                      {user?.role === 'super_admin' && (
+                        <button
+                          onClick={() => handleDelete(product._id, product.name)}
+                          className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                          title="Delete product"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

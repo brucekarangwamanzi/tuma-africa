@@ -5,6 +5,25 @@ const { body, validationResult } = require('express-validator');
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /users/profile:
+ *   get:
+ *     summary: Get user profile
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ */
 // @route   GET /api/users/profile
 // @desc    Get user profile
 // @access  Private
@@ -21,6 +40,36 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /users/profile:
+ *   put:
+ *     summary: Update user profile
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               address:
+ *                 type: object
+ *               profileImage:
+ *                 type: string
+ *               currency:
+ *                 type: string
+ *                 enum: [USD, RWF, Yuan]
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ */
 // @route   PUT /api/users/profile
 // @desc    Update user profile
 // @access  Private

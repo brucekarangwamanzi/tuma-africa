@@ -61,6 +61,43 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Request logging middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const method = req.method;
+  const url = req.originalUrl || req.url;
+  const ip = req.ip || req.connection.remoteAddress;
+  
+  console.log(`[${timestamp}] ${method} ${url} - IP: ${ip}`);
+  
+  // Log request body for POST/PUT/PATCH (except sensitive data)
+  if (['POST', 'PUT', 'PATCH'].includes(method) && req.body) {
+    const bodyToLog = { ...req.body };
+    // Hide sensitive fields
+    if (bodyToLog.password) bodyToLog.password = '***';
+    if (bodyToLog.passwordHash) bodyToLog.passwordHash = '***';
+    if (bodyToLog.refreshToken) bodyToLog.refreshToken = '***';
+    if (bodyToLog.accessToken) bodyToLog.accessToken = '***';
+    
+    console.log(`[${timestamp}] Request Body:`, JSON.stringify(bodyToLog, null, 2));
+  }
+  
+  // Log response
+  const originalSend = res.send;
+  res.send = function(data) {
+    const statusCode = res.statusCode;
+    const statusEmoji = statusCode >= 200 && statusCode < 300 ? '✅' : 
+                       statusCode >= 400 && statusCode < 500 ? '⚠️' : 
+                       statusCode >= 500 ? '❌' : 'ℹ️';
+    
+    console.log(`[${timestamp}] ${statusEmoji} ${method} ${url} - Status: ${statusCode}`);
+    
+    return originalSend.call(this, data);
+  };
+  
+  next();
+});
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -68,13 +105,35 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Swagger API Documentation
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Tuma-Africa API Documentation',
+  customfavIcon: '/favicon.ico',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    filter: true,
+    tryItOutEnabled: true
+  }
+}));
+
 // Database connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/tuma-africa-cargo', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
-.then(() => console.log('MongoDB connected successfully'))
-.catch(err => console.error('MongoDB connection error:', err));
+.then(() => {
+  console.log('✅ MongoDB connected successfully');
+  console.log(`📊 Database: ${process.env.MONGODB_URI ? 'Remote' : 'Local (mongodb://localhost:27017/tuma-africa-cargo)'}`);
+})
+.catch(err => {
+  console.error('❌ MongoDB connection error:', err.message);
+  console.error('💡 Make sure MongoDB is running and MONGODB_URI is correct');
+});
 
 // Health check endpoint (must be before other routes)
 app.use('/api', require('./health'));
@@ -116,9 +175,24 @@ app.use('*', (req, res) => {
 const PORT = process.env.PORT || 5001;
 const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for mobile access
 const server = app.listen(PORT, HOST, () => {
-  console.log(`Server running on ${HOST}:${PORT}`);
-  console.log(`Local access: http://localhost:${PORT}`);
-  console.log(`Network access: http://192.168.0.246:${PORT}`);
+  console.log('\n' + '='.repeat(60));
+  console.log('🚀 BACKEND SERVER STARTED');
+  console.log('='.repeat(60));
+  console.log(`📡 Server running on ${HOST}:${PORT}`);
+  console.log(`🌐 Local access: http://localhost:${PORT}`);
+  console.log(`🌐 Network access: http://192.168.0.246:${PORT}`);
+  console.log(`📚 Swagger API Docs: http://localhost:${PORT}/api-docs`);
+  console.log(`❤️  Health Check: http://localhost:${PORT}/api/health`);
+  console.log('='.repeat(60));
+  console.log('📋 Available Endpoints:');
+  console.log('   - POST /api/auth/login');
+  console.log('   - POST /api/auth/register');
+  console.log('   - GET  /api/products');
+  console.log('   - POST /api/products (Super Admin)');
+  console.log('   - GET  /api/orders');
+  console.log('   - POST /api/orders');
+  console.log('   - ... and more');
+  console.log('='.repeat(60) + '\n');
 });
 
 // Make io accessible to routes

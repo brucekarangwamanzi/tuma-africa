@@ -39,6 +39,40 @@ const upload = multer({
   }
 });
 
+/**
+ * @swagger
+ * /chat/messages:
+ *   post:
+ *     summary: Send a chat message
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *                 enum: [text, file, image]
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Message sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: object
+ */
 // @route   POST /api/chat/messages
 // @desc    Send a message (simplified for support chat)
 // @access  Private
@@ -113,6 +147,27 @@ router.post('/messages', authenticateToken, upload.single('file'), async (req, r
   }
 });
 
+/**
+ * @swagger
+ * /chat/messages:
+ *   get:
+ *     summary: Get chat messages
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Chat messages retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 messages:
+ *                   type: array
+ *                 chats:
+ *                   type: array
+ */
 // @route   GET /api/chat/messages
 // @desc    Get user's chat messages (simplified for support chat)
 // @access  Private

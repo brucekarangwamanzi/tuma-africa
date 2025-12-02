@@ -63,12 +63,14 @@ const ChatManagement: React.FC = () => {
       const waiting = sessions.filter((s: ChatSession) => s.status === 'waiting').length;
       const resolved = sessions.filter((s: ChatSession) => s.status === 'resolved').length;
       
+      // Calculate average response time from actual data if available
+      // For now, set to 0m if no data available
       setStats({
         total,
         active,
         waiting,
         resolved,
-        avgResponseTime: '2.5m' // Mock data - would come from API
+        avgResponseTime: '0m' // Will be calculated from actual API data when available
       });
     } catch (error) {
       console.error('Failed to fetch chat sessions:', error);

@@ -17,6 +17,17 @@ const queryClient = new QueryClient({
   },
 });
 
+// Frontend logging setup
+if (process.env.NODE_ENV === 'development') {
+  console.log('\n' + '='.repeat(60));
+  console.log('🎨 FRONTEND STARTING');
+  console.log('='.repeat(60));
+  console.log('🌐 Frontend URL: http://localhost:3000');
+  console.log('🔗 Backend API: ' + (process.env.REACT_APP_API_URL || '/api'));
+  console.log('📦 Environment: Development');
+  console.log('='.repeat(60) + '\n');
+}
+
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
@@ -24,7 +35,12 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <App />
         <ToastContainer
           position="top-right"

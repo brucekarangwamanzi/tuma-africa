@@ -3,6 +3,32 @@ const AdminSettings = require('../models/AdminSettings');
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * /public/settings:
+ *   get:
+ *     summary: Get public admin settings (no authentication required)
+ *     tags: [Public]
+ *     responses:
+ *       200:
+ *         description: Public settings retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 settings:
+ *                   type: object
+ *                   properties:
+ *                     heroSection:
+ *                       type: object
+ *                     productSection:
+ *                       type: object
+ *                     companyInfo:
+ *                       type: object
+ *                     theme:
+ *                       type: object
+ */
 // @route   GET /api/public/settings
 // @desc    Get public admin settings (no auth required)
 // @access  Public

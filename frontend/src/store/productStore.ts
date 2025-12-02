@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { useAuthStore } from './authStore';
 
 interface Product {
   _id: string;
@@ -55,6 +56,7 @@ interface Product {
     reviewCount: number;
   };
   featured: boolean;
+  status?: 'draft' | 'published';
   isActive: boolean;
   createdBy?: {
     fullName: string;
@@ -72,6 +74,7 @@ interface ProductFormData {
   description: string;
   price: number;
   originalPrice?: number;
+  currency?: string;
   imageUrl: string;
   images: string[];
   category: string;
@@ -112,6 +115,7 @@ interface ProductFormData {
     freeShippingThreshold?: number;
   };
   featured: boolean;
+  status?: 'draft' | 'published';
   isActive: boolean;
 }
 
@@ -149,6 +153,7 @@ interface ProductState {
   fetchProduct: (productId: string) => Promise<void>;
   createProduct: (productData: ProductFormData) => Promise<Product>;
   updateProduct: (productId: string, productData: Partial<ProductFormData>) => Promise<void>;
+  changeProductStatus: (productId: string, status: 'draft' | 'published') => Promise<Product>;
   deleteProduct: (productId: string) => Promise<void>;
   toggleFeatured: (productId: string) => Promise<void>;
   fetchCategories: () => Promise<void>;
@@ -215,8 +220,86 @@ export const useProductStore = create<ProductState>((set, get) => ({
     set({ isSubmitting: true, error: null });
     
     try {
-      const response = await axios.post('/products', productData);
-      const newProduct = response.data.product;
+      // Get token from auth store
+      const { accessToken } = useAuthStore.getState();
+      
+      // Ensure we have authentication token
+      const authToken = accessToken 
+        ? `Bearer ${accessToken}` 
+        : axios.defaults.headers.common['Authorization'] as string;
+      
+      if (!authToken) {
+        const error = new Error('Authentication token missing. Please log in again.');
+        set({
+          error: error.message,
+          isSubmitting: false
+        });
+        toast.error(error.message);
+        throw error;
+      }
+      
+      // Clean and validate data before sending
+      const cleanedData: any = {
+        name: productData.name.trim(),
+        description: productData.description.trim(),
+        price: typeof productData.price === 'string' ? parseFloat(productData.price) : productData.price,
+        imageUrl: productData.imageUrl.trim(),
+        category: productData.category.trim(),
+        currency: productData.currency || 'USD',
+        images: productData.images || [],
+        tags: productData.tags || [],
+        featured: productData.featured || false,
+        isActive: productData.isActive !== undefined ? productData.isActive : true,
+      };
+      
+      // Add optional fields only if they have values
+      if (productData.originalPrice && productData.originalPrice > 0) {
+        cleanedData.originalPrice = typeof productData.originalPrice === 'string' 
+          ? parseFloat(productData.originalPrice) 
+          : productData.originalPrice;
+      }
+      if (productData.subcategory?.trim()) {
+        cleanedData.subcategory = productData.subcategory.trim();
+      }
+      if (productData.specifications) {
+        cleanedData.specifications = productData.specifications;
+      }
+      if (productData.supplier) {
+        cleanedData.supplier = productData.supplier;
+      }
+      if (productData.stock) {
+        cleanedData.stock = productData.stock;
+      }
+      if (productData.shipping) {
+        cleanedData.shipping = productData.shipping;
+      }
+      
+      console.log('📦 Creating product:', cleanedData.name);
+      console.log('🔑 Auth token present:', !!authToken);
+      console.log('📤 Sending cleaned product data:', JSON.stringify(cleanedData, null, 2));
+      
+      const response = await axios.post('/products', cleanedData, {
+        headers: {
+          'Authorization': authToken,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('📥 Full response:', response);
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response data:', response.data);
+      
+      const newProduct = response.data?.product;
+      
+      if (!newProduct) {
+        console.error('❌ No product in response:', response.data);
+        throw new Error('Invalid response: product not returned in response.data.product');
+      }
+      
+      if (!newProduct._id && !newProduct.id) {
+        console.error('❌ Product missing ID:', newProduct);
+        throw new Error('Invalid response: product missing _id or id');
+      }
       
       // Add to products list
       const { products } = get();
@@ -225,14 +308,125 @@ export const useProductStore = create<ProductState>((set, get) => ({
         isSubmitting: false
       });
       
-      toast.success('Product created successfully!');
+      // Enhanced success logging
+      console.log('='.repeat(60));
+      console.log('✅ PRODUCT CREATED SUCCESSFULLY!');
+      console.log('='.repeat(60));
+      console.log('📦 Product ID:', newProduct._id || newProduct.id);
+      console.log('📝 Product Name:', newProduct.name);
+      console.log('💰 Price:', newProduct.price, newProduct.currency || 'USD');
+      console.log('📂 Category:', newProduct.category);
+      console.log('👁️  Status:', newProduct.status || (newProduct.isActive ? 'published' : 'draft'));
+      console.log('✅ Visible to users:', newProduct.isActive ? 'Yes' : 'No');
+      console.log('⭐ Featured:', newProduct.featured ? 'Yes' : 'No');
+      console.log('📅 Created at:', new Date(newProduct.createdAt || Date.now()).toLocaleString());
+      console.log('='.repeat(60));
+      console.log('🔄 User will be redirected to products list in 1.5 seconds...');
+      console.log('='.repeat(60));
+      
+      // Show alert message
+      alert(`✅ Product Created Successfully!\n\n📦 Product: ${newProduct.name}\n💰 Price: ${newProduct.price} ${newProduct.currency || 'USD'}\n📂 Category: ${newProduct.category}\n✅ Status: ${newProduct.status || (newProduct.isActive ? 'Published' : 'Draft')}\n\n🔄 You will be redirected to the products list...`);
+      
+      // Also show toast notification
+      toast.success('✅ Product created successfully! Redirecting to products list...', {
+        autoClose: 2000,
+        position: 'top-right'
+      });
+      
       return newProduct;
     } catch (error: any) {
-      console.error('Failed to create product:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to create product';
+      console.error('❌ Failed to create product:', error);
+      console.error('   Status:', error.response?.status);
+      console.error('   Data:', error.response?.data);
+      console.error('   Message:', error.message);
+      console.error('   Request URL:', error.config?.url);
+      console.error('   Request method:', error.config?.method);
+      
+      let errorMessage = 'Failed to create product';
+      let errorDetails = '';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication failed';
+        errorDetails = 'Your session may have expired. Please log in again.';
+      } else if (error.response?.status === 403) {
+        errorMessage = 'Access denied';
+        errorDetails = 'Only Super Admins can create products. Please check your user role.';
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Validation error';
+        const validationErrors = error.response?.data?.errors || [];
+        if (validationErrors.length > 0) {
+          errorDetails = validationErrors.map((e: any) => `${e.field}: ${e.message}`).join(', ');
+        } else {
+          errorDetails = error.response?.data?.message || 'Please check all required fields are filled correctly.';
+        }
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error';
+        errorDetails = 'The server encountered an error. Please try again later.';
+      } else if (error.response?.status === 0 || !error.response) {
+        errorMessage = 'Network error';
+        errorDetails = 'Cannot connect to server. Please check if the backend is running.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+        errorDetails = error.response.data.error || '';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      const fullErrorMessage = errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage;
+      
+      set({
+        error: fullErrorMessage,
+        isSubmitting: false
+      });
+      
+      toast.error(fullErrorMessage, {
+        autoClose: 6000
+      });
+      
+      throw new Error(fullErrorMessage);
+    }
+  },
+
+  changeProductStatus: async (productId: string, status: 'draft' | 'published') => {
+    set({ isLoading: true, error: null });
+    
+    try {
+      const { accessToken } = useAuthStore.getState();
+      const authToken = accessToken ? `Bearer ${accessToken}` : '';
+      
+      const response = await axios.put(
+        `/products/${productId}/status`,
+        { status },
+        {
+          headers: {
+            'Authorization': authToken,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      const updatedProduct = response.data.product;
+      
+      // Update product in list
+      const { products, currentProduct } = get();
+      const updatedProducts = products.map(product =>
+        product._id === productId ? updatedProduct : product
+      );
+      
+      set({
+        products: updatedProducts,
+        currentProduct: currentProduct?._id === productId ? updatedProduct : currentProduct,
+        isLoading: false
+      });
+      
+      toast.success(`Product ${status === 'published' ? 'published' : 'hidden'} successfully`);
+      
+      return updatedProduct;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to change product status';
       set({
         error: errorMessage,
-        isSubmitting: false
+        isLoading: false
       });
       toast.error(errorMessage);
       throw error;

@@ -183,6 +183,21 @@ const validateProductCreation = [
     .isIn(['USD', 'RWF', 'Yuan'])
     .withMessage('Currency must be USD, RWF, or Yuan'),
   
+  body('status')
+    .optional()
+    .isIn(['draft', 'published'])
+    .withMessage('Status must be either "draft" or "published"'),
+  
+  body('featured')
+    .optional()
+    .isBoolean()
+    .withMessage('Featured must be a boolean value'),
+  
+  body('isActive')
+    .optional()
+    .isBoolean()
+    .withMessage('isActive must be a boolean value'),
+  
   handleValidationErrors
 ];
 
