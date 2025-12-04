@@ -1,12 +1,6 @@
 import React from 'react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-
-interface Order {
-  _id: string;
-  createdAt: string;
-  finalAmount?: number;
-  status: string;
-}
+import { Order } from '../../store/orderStore';
 
 interface OrderTimelineChartProps {
   orders: Order[];

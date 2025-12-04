@@ -18,9 +18,11 @@ import {
   Activity,
   Users,
   DollarSign,
-  User
+  User,
+  Mail,
+  Phone
 } from 'lucide-react';
-import { useOrderStore } from '../../store/orderStore';
+import { useOrderStore, getOrderId } from '../../store/orderStore';
 import { formatDistanceToNow } from 'date-fns';
 import OrderStatusChart from '../../components/admin/OrderStatusChart';
 import OrderTimelineChart from '../../components/admin/OrderTimelineChart';
@@ -429,7 +431,7 @@ const AdminOrderManagementPage: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {orders.map((order) => (
-                <div key={order._id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 flex flex-col">
+                <div key={getOrderId(order)} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 flex flex-col">
                   <div className="p-4 flex-1">
                     {/* Header */}
                     <div className="flex items-center justify-between mb-3">
@@ -453,18 +455,34 @@ const AdminOrderManagementPage: React.FC = () => {
                     </div>
                     
                     {/* Customer Information */}
-                    {order.userId && (
-                      <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="flex items-center space-x-2">
-                          <User className="w-3 h-3 text-blue-600 flex-shrink-0" />
+                    {(order.userId || (order as any).user) && (
+                      <div className="mb-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm">
+                        <div className="flex items-start space-x-2">
+                          <div className="p-1.5 bg-blue-100 rounded-lg flex-shrink-0">
+                            <User className="w-4 h-4 text-blue-600" />
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold text-gray-900 truncate">
-                              {order.userId.fullName || 'Unknown Customer'}
+                            <p className="text-xs font-semibold text-blue-900 uppercase mb-1.5">
+                              Customer Information
                             </p>
-                            {order.userId.email && (
-                              <p className="text-xs text-gray-600 truncate">
-                                {order.userId.email}
-                              </p>
+                            <p className="text-sm font-bold text-gray-900 truncate mb-2">
+                              {(order.userId || (order as any).user)?.fullName || 'Unknown Customer'}
+                            </p>
+                            {((order.userId || (order as any).user)?.email) && (
+                              <div className="flex items-center space-x-1.5 mb-1">
+                                <Mail className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                                <p className="text-xs text-gray-700 truncate">
+                                  {(order.userId || (order as any).user)?.email}
+                                </p>
+                              </div>
+                            )}
+                            {((order.userId || (order as any).user)?.phone) && (
+                              <div className="flex items-center space-x-1.5">
+                                <Phone className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                                <p className="text-xs text-gray-700 truncate">
+                                  {(order.userId || (order as any).user)?.phone}
+                                </p>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -526,7 +544,7 @@ const AdminOrderManagementPage: React.FC = () => {
                   <div className="p-4 pt-0 border-t border-gray-100 space-y-2">
                     <select
                       value={order.status}
-                      onChange={(e) => handleStatusUpdate(order._id, e.target.value, order.orderId)}
+                      onChange={(e) => handleStatusUpdate(getOrderId(order), e.target.value, order.orderId)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs font-medium"
                     >
                       <option value="pending">Pending</option>
@@ -538,7 +556,7 @@ const AdminOrderManagementPage: React.FC = () => {
                     
                     <div className="flex space-x-2">
                       <Link
-                        to={`/admin/orders/${order._id}`}
+                        to={`/admin/orders/${getOrderId(order)}`}
                         className="flex-1 flex items-center justify-center px-2 py-1.5 text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
                       >
                         <Eye className="w-3 h-3 mr-1" />
@@ -546,7 +564,7 @@ const AdminOrderManagementPage: React.FC = () => {
                       </Link>
                       
                       <Link
-                        to={`/admin/orders/${order._id}/edit`}
+                        to={`/admin/orders/${getOrderId(order)}/edit`}
                         className="flex-1 flex items-center justify-center px-2 py-1.5 text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-xs font-medium"
                       >
                         <Edit className="w-3 h-3 mr-1" />

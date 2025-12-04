@@ -11,15 +11,26 @@ import {
   DollarSign,
   AlertCircle
 } from 'lucide-react';
-import { useOrderStore } from '../../store/orderStore';
+import { useOrderStore, getOrderId } from '../../store/orderStore';
 import { toast } from 'react-toastify';
+import axios from 'axios';
+
+// Helper function to convert price to number (handles both string and number)
+const getPriceNumber = (price: number | string | undefined): number => {
+  if (price === undefined || price === null) return 0;
+  if (typeof price === 'number') return price;
+  if (typeof price === 'string') {
+    const parsed = parseFloat(price);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+};
 
 const AdminOrderEditPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const { orders, isLoading, fetchOrders, updateOrderStatus } = useOrderStore();
+  const { currentOrder, isLoading, fetchOrder, updateOrderStatus } = useOrderStore();
   
-  const [order, setOrder] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [formData, setFormData] = useState({
     status: '',
@@ -37,51 +48,28 @@ const AdminOrderEditPage: React.FC = () => {
 
   useEffect(() => {
     if (orderId) {
-      const existingOrder = orders.find(o => o._id === orderId);
-      if (existingOrder) {
-        setOrder(existingOrder);
-        setFormData({
-          status: existingOrder.status || '',
-          priority: existingOrder.priority || 'normal',
-          trackingNumber: existingOrder.trackingInfo?.trackingNumber || '',
-          carrier: existingOrder.trackingInfo?.carrier || '',
-          estimatedDelivery: existingOrder.trackingInfo?.estimatedDelivery ? 
-            new Date(existingOrder.trackingInfo.estimatedDelivery).toISOString().split('T')[0] : '',
-          notes: (existingOrder as any).notes || '',
-          customerName: (existingOrder as any).customerName || '',
-          customerEmail: (existingOrder as any).customerEmail || '',
-          customerPhone: (existingOrder as any).customerPhone || '',
-          shippingCost: existingOrder.shippingCost || 0,
-          unitPrice: existingOrder.unitPrice || 0
-        });
-      } else {
-        fetchOrders(new URLSearchParams());
-      }
+      fetchOrder(orderId);
     }
-  }, [orderId, orders, fetchOrders]);
+  }, [orderId, fetchOrder]);
 
   useEffect(() => {
-    if (orderId && orders.length > 0) {
-      const foundOrder = orders.find(o => o._id === orderId);
-      if (foundOrder) {
-        setOrder(foundOrder);
-        setFormData({
-          status: foundOrder.status || '',
-          priority: foundOrder.priority || 'normal',
-          trackingNumber: foundOrder.trackingInfo?.trackingNumber || '',
-          carrier: foundOrder.trackingInfo?.carrier || '',
-          estimatedDelivery: foundOrder.trackingInfo?.estimatedDelivery ? 
-            new Date(foundOrder.trackingInfo.estimatedDelivery).toISOString().split('T')[0] : '',
-          notes: (foundOrder as any).notes || '',
-          customerName: (foundOrder as any).customerName || '',
-          customerEmail: (foundOrder as any).customerEmail || '',
-          customerPhone: (foundOrder as any).customerPhone || '',
-          shippingCost: foundOrder.shippingCost || 0,
-          unitPrice: foundOrder.unitPrice || 0
-        });
-      }
+    if (currentOrder) {
+      setFormData({
+        status: currentOrder.status || '',
+        priority: currentOrder.priority || 'normal',
+        trackingNumber: currentOrder.trackingInfo?.trackingNumber || '',
+        carrier: currentOrder.trackingInfo?.carrier || '',
+        estimatedDelivery: currentOrder.trackingInfo?.estimatedDelivery ? 
+          new Date(currentOrder.trackingInfo.estimatedDelivery).toISOString().split('T')[0] : '',
+        notes: (currentOrder as any).notes || '',
+        customerName: currentOrder.userId?.fullName || '',
+        customerEmail: currentOrder.userId?.email || '',
+        customerPhone: currentOrder.userId?.phone || '',
+        shippingCost: getPriceNumber(currentOrder.shippingCost),
+        unitPrice: getPriceNumber(currentOrder.unitPrice)
+      });
     }
-  }, [orderId, orders]);
+  }, [currentOrder]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
@@ -91,25 +79,52 @@ const AdminOrderEditPage: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!order || !orderId) return;
+    if (!currentOrder || !orderId) return;
     
     setIsUpdating(true);
     try {
-      // For now, we'll just update the status since that's what the store supports
-      // In a real app, you'd have a more comprehensive update API
-      await updateOrderStatus(orderId, formData.status);
+      // Prepare update payload
+      const updatePayload: any = {
+        status: formData.status,
+        priority: formData.priority,
+        shippingCost: formData.shippingCost,
+        unitPrice: formData.unitPrice
+      };
+
+      // Add tracking info if provided
+      if (formData.trackingNumber || formData.carrier || formData.estimatedDelivery) {
+        updatePayload.trackingInfo = {
+          trackingNumber: formData.trackingNumber || undefined,
+          carrier: formData.carrier || undefined,
+          estimatedDelivery: formData.estimatedDelivery ? new Date(formData.estimatedDelivery).toISOString() : undefined
+        };
+      }
+
+      // Add notes if provided
+      if (formData.notes) {
+        updatePayload.notes = formData.notes;
+      }
+
+      // Update order via API
+      await axios.put(`/orders/${orderId}`, updatePayload);
+      
+      // Also update status if changed
+      if (formData.status !== currentOrder.status) {
+        await updateOrderStatus(orderId, formData.status);
+      }
       
       toast.success('Order updated successfully');
       navigate(`/admin/orders/${orderId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update order:', error);
-      toast.error('Failed to update order');
+      const errorMessage = error.response?.data?.message || 'Failed to update order';
+      toast.error(errorMessage);
     } finally {
       setIsUpdating(false);
     }
   };
 
-  if (isLoading && !order) {
+  if (isLoading && !currentOrder) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="flex flex-col items-center space-y-4">
@@ -120,7 +135,7 @@ const AdminOrderEditPage: React.FC = () => {
     );
   }
 
-  if (!order) {
+  if (!currentOrder) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="text-center">
@@ -140,7 +155,7 @@ const AdminOrderEditPage: React.FC = () => {
     );
   }
 
-  const finalAmount = (formData.unitPrice * order.quantity) + formData.shippingCost;
+  const finalAmount = currentOrder ? (formData.unitPrice * currentOrder.quantity) + formData.shippingCost : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -157,7 +172,7 @@ const AdminOrderEditPage: React.FC = () => {
               </button>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Edit Order</h1>
-                <p className="text-gray-600 mt-1">Order ID: {order.orderId}</p>
+                <p className="text-gray-600 mt-1">Order ID: {currentOrder.orderId}</p>
               </div>
             </div>
             
@@ -239,7 +254,10 @@ const AdminOrderEditPage: React.FC = () => {
                   onChange={(e) => handleInputChange('customerName', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter customer name"
+                  readOnly
+                  disabled
                 />
+                <p className="text-xs text-gray-500 mt-1">Read-only (from user account)</p>
               </div>
               
               <div>
@@ -252,7 +270,10 @@ const AdminOrderEditPage: React.FC = () => {
                   onChange={(e) => handleInputChange('customerEmail', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter email address"
+                  readOnly
+                  disabled
                 />
+                <p className="text-xs text-gray-500 mt-1">Read-only (from user account)</p>
               </div>
               
               <div>
@@ -265,7 +286,10 @@ const AdminOrderEditPage: React.FC = () => {
                   onChange={(e) => handleInputChange('customerPhone', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter phone number"
+                  readOnly
+                  disabled
                 />
+                <p className="text-xs text-gray-500 mt-1">Read-only (from user account)</p>
               </div>
             </div>
           </div>
@@ -312,7 +336,7 @@ const AdminOrderEditPage: React.FC = () => {
                 </label>
                 <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
                   <span className="text-lg font-bold text-green-700">
-                    ${finalAmount.toLocaleString()}
+                    ${finalAmount.toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -320,10 +344,10 @@ const AdminOrderEditPage: React.FC = () => {
             
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
               <div className="text-sm text-gray-600">
-                <p>Quantity: {order.quantity}</p>
-                <p>Subtotal: ${(formData.unitPrice * order.quantity).toLocaleString()}</p>
-                <p>Shipping: ${formData.shippingCost.toLocaleString()}</p>
-                <p className="font-semibold text-gray-900">Total: ${finalAmount.toLocaleString()}</p>
+                <p>Quantity: {currentOrder.quantity}</p>
+                <p>Subtotal: ${(formData.unitPrice * currentOrder.quantity).toFixed(2)}</p>
+                <p>Shipping: ${formData.shippingCost.toFixed(2)}</p>
+                <p className="font-semibold text-gray-900">Total: ${finalAmount.toFixed(2)}</p>
               </div>
             </div>
           </div>

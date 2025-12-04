@@ -20,30 +20,8 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
-import { useOrderStore } from '../store/orderStore';
+import { useOrderStore, getOrderId, Order } from '../store/orderStore';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-
-interface Order {
-  _id: string;
-  orderId: string;
-  productName: string;
-  productLink: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-  shippingCost: number;
-  finalAmount: number;
-  status: string;
-  priority: string;
-  description?: string;
-  trackingInfo?: {
-    trackingNumber?: string;
-    carrier?: string;
-    estimatedDelivery?: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface OrdersResponse {
   orders: Order[];
@@ -73,18 +51,24 @@ const OrdersPage: React.FC = () => {
   });
 
   useEffect(() => {
-    loadOrders();
+    // Debounce to prevent rapid requests
+    const timeoutId = setTimeout(() => {
+      loadOrders();
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {
     // Calculate stats when orders change
     if (orders.length > 0) {
       const total = orders.length;
-      const pending = orders.filter((o: Order) => o.status === 'pending').length;
-      const processing = orders.filter((o: Order) => o.status === 'processing').length;
-      const shipped = orders.filter((o: Order) => o.status === 'shipped').length;
-      const delivered = orders.filter((o: Order) => o.status === 'delivered').length;
-      const totalValue = orders.reduce((sum: number, o: Order) => sum + o.finalAmount, 0);
+      const pending = orders.filter((o) => o.status === 'pending').length;
+      const processing = orders.filter((o) => o.status === 'processing').length;
+      const shipped = orders.filter((o) => o.status === 'shipped').length;
+      const delivered = orders.filter((o) => o.status === 'delivered').length;
+      const totalValue = orders.reduce((sum, o) => sum + (o.finalAmount || 0), 0);
       
       setStats({ total, pending, processing, shipped, delivered, totalValue });
     }
@@ -402,8 +386,8 @@ const OrdersPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {orders.map((order) => (
                 <Link
-                  key={order._id}
-                  to={`/orders/${order._id}`}
+                  key={getOrderId(order)}
+                  to={`/orders/${getOrderId(order)}`}
                   className="block bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 flex flex-col"
                 >
                   <div className="p-4 flex-1 flex flex-col">

@@ -2,11 +2,13 @@ import { create } from 'zustand';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-interface Order {
-  _id: string;
+export interface Order {
+  id?: string; // PostgreSQL UUID
+  _id?: string; // MongoDB ObjectId (for backward compatibility)
   orderId: string;
   userId?: {
-    _id?: string;
+    id?: string; // PostgreSQL UUID
+    _id?: string; // MongoDB ObjectId (for backward compatibility)
     fullName?: string;
     email?: string;
     phone?: string;
@@ -43,6 +45,11 @@ interface Order {
   createdAt: string;
   updatedAt: string;
 }
+
+// Helper function to get order ID (supports both id and _id)
+export const getOrderId = (order: Order): string => {
+  return order.id || order._id || '';
+};
 
 interface OrderFormData {
   productName: string;
@@ -94,6 +101,13 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
   // Actions
   fetchOrders: async (params?: URLSearchParams) => {
+    const state = get();
+    // Prevent multiple simultaneous requests
+    if (state.isLoading) {
+      console.log('⏳ Already fetching orders, skipping duplicate request');
+      return;
+    }
+    
     set({ isLoading: true, error: null });
     
     try {
@@ -101,18 +115,37 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const response = await axios.get(`/orders${queryString}`);
       const data: OrdersResponse = response.data;
       
+      // Map backend response to frontend format
+      // Backend returns 'user' (from Sequelize association) but frontend expects 'userId'
+      const mappedOrders = data.orders.map((order: any) => {
+        const mapped = { ...order };
+        // If backend returned 'user', map it to 'userId' for frontend consistency
+        if (order.user && !order.userId) {
+          mapped.userId = order.user;
+        } else if (!order.userId) {
+          // Fallback: if neither exists, create empty userId object
+          mapped.userId = null;
+        }
+        return mapped;
+      });
+      
       set({
-        orders: data.orders,
+        orders: mappedOrders,
         pagination: data.pagination,
         isLoading: false
       });
     } catch (error: any) {
       console.error('Failed to fetch orders:', error);
+      
+      // Don't show error toast for rate limiting (429) - user can retry
+      if (error.response?.status !== 429) {
+        toast.error('Failed to load orders');
+      }
+      
       set({
         error: error.response?.data?.message || 'Failed to fetch orders',
         isLoading: false
       });
-      toast.error('Failed to load orders');
     }
   },
 
@@ -121,8 +154,21 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     
     try {
       const response = await axios.get(`/orders/${orderId}`);
+      const order = response.data.order;
+      
+      // Map backend response to frontend format
+      // Backend returns 'user' (from Sequelize association) but frontend expects 'userId'
+      const mappedOrder: any = { ...order };
+      // If backend returned 'user', map it to 'userId' for frontend consistency
+      if (order.user && !order.userId) {
+        mappedOrder.userId = order.user;
+      } else if (!order.userId) {
+        // Fallback: if neither exists, set userId to null
+        mappedOrder.userId = null;
+      }
+      
       set({
-        currentOrder: response.data.order,
+        currentOrder: mappedOrder,
         isLoading: false
       });
     } catch (error: any) {
@@ -195,12 +241,12 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       // Update order in list
       const { orders, currentOrder } = get();
       const updatedOrders = orders.map(order =>
-        order._id === orderId ? { ...order, status } : order
+        getOrderId(order) === orderId ? { ...order, status } : order
       );
       
       set({
         orders: updatedOrders,
-        currentOrder: currentOrder?._id === orderId 
+        currentOrder: currentOrder && getOrderId(currentOrder) === orderId 
           ? { ...currentOrder, status } 
           : currentOrder,
         isSubmitting: false
@@ -226,7 +272,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       
       // Remove from orders list
       const { orders } = get();
-      const updatedOrders = orders.filter(order => order._id !== orderId);
+      const updatedOrders = orders.filter(order => getOrderId(order) !== orderId);
       
       set({
         orders: updatedOrders,

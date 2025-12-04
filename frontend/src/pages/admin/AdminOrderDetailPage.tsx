@@ -17,48 +17,31 @@ import {
   Calendar,
   FileText
 } from 'lucide-react';
-import { useOrderStore } from '../../store/orderStore';
+import { useOrderStore, getOrderId } from '../../store/orderStore';
 import { formatDistanceToNow } from 'date-fns';
 
 const AdminOrderDetailPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const { orders, isLoading, fetchOrders, updateOrderStatus } = useOrderStore();
+  const { currentOrder, isLoading, fetchOrder, updateOrderStatus } = useOrderStore();
   
-  const [order, setOrder] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     if (orderId) {
-      // Try to find order in current orders first
-      const existingOrder = orders.find(o => o._id === orderId);
-      if (existingOrder) {
-        setOrder(existingOrder);
-      } else {
-        // If not found, fetch orders (this will get all orders)
-        fetchOrders(new URLSearchParams());
-      }
+      fetchOrder(orderId);
     }
-  }, [orderId, orders, fetchOrders]);
-
-  useEffect(() => {
-    // Update order when orders change
-    if (orderId && orders.length > 0) {
-      const foundOrder = orders.find(o => o._id === orderId);
-      if (foundOrder) {
-        setOrder(foundOrder);
-      }
-    }
-  }, [orderId, orders]);
+  }, [orderId, fetchOrder]);
 
   const handleStatusUpdate = async (newStatus: string) => {
-    if (!order || !orderId) return;
+    if (!currentOrder || !orderId) return;
     
-    if (window.confirm(`Update order ${order.orderId} status to ${newStatus}?`)) {
+    if (window.confirm(`Update order ${currentOrder.orderId} status to ${newStatus}?`)) {
       setIsUpdating(true);
       try {
         await updateOrderStatus(orderId, newStatus);
-        setOrder({ ...order, status: newStatus });
+        // Refetch order to get updated data
+        await fetchOrder(orderId);
       } catch (error) {
         console.error('Failed to update order status:', error);
       } finally {
@@ -106,7 +89,7 @@ const AdminOrderDetailPage: React.FC = () => {
     );
   };
 
-  if (isLoading && !order) {
+  if (isLoading && !currentOrder) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="flex flex-col items-center space-y-4">
@@ -117,7 +100,7 @@ const AdminOrderDetailPage: React.FC = () => {
     );
   }
 
-  if (!order) {
+  if (!currentOrder) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="text-center">
@@ -152,13 +135,13 @@ const AdminOrderDetailPage: React.FC = () => {
               </button>
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Order Details</h1>
-                <p className="text-gray-600 mt-1">Order ID: {order.orderId}</p>
+                <p className="text-gray-600 mt-1">Order ID: {currentOrder.orderId}</p>
               </div>
             </div>
             
             <div className="flex items-center space-x-3">
               <Link
-                to={`/admin/orders/${order._id}/edit`}
+                to={`/admin/orders/${getOrderId(currentOrder)}/edit`}
                 className="flex items-center px-4 py-2 text-blue-600 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors"
               >
                 <Edit className="w-4 h-4 mr-2" />
@@ -175,7 +158,7 @@ const AdminOrderDetailPage: React.FC = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">Order Status</h2>
-                {getStatusBadge(order.status)}
+                {getStatusBadge(currentOrder.status)}
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -184,7 +167,7 @@ const AdminOrderDetailPage: React.FC = () => {
                     Update Status
                   </label>
                   <select
-                    value={order.status}
+                    value={currentOrder.status}
                     onChange={(e) => handleStatusUpdate(e.target.value)}
                     disabled={isUpdating}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -203,12 +186,12 @@ const AdminOrderDetailPage: React.FC = () => {
                   </label>
                   <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      order.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                      order.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                      order.priority === 'normal' ? 'bg-blue-100 text-blue-800' :
+                      currentOrder.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                      currentOrder.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                      currentOrder.priority === 'normal' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {order.priority?.charAt(0).toUpperCase() + order.priority?.slice(1) || 'Normal'}
+                      {currentOrder.priority?.charAt(0).toUpperCase() + currentOrder.priority?.slice(1) || 'Normal'}
                     </span>
                   </div>
                 </div>
@@ -221,38 +204,38 @@ const AdminOrderDetailPage: React.FC = () => {
               
               <div className="space-y-4">
                 <div>
-                  <h3 className="font-semibold text-gray-900 text-lg">{order.productName}</h3>
-                  {order.description && (
-                    <p className="text-gray-600 mt-1">{order.description}</p>
+                  <h3 className="font-semibold text-gray-900 text-lg">{currentOrder.productName}</h3>
+                  {currentOrder.description && (
+                    <p className="text-gray-600 mt-1">{currentOrder.description}</p>
                   )}
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-sm text-gray-600">Quantity</p>
-                    <p className="text-lg font-semibold text-gray-900">{order.quantity}</p>
+                    <p className="text-lg font-semibold text-gray-900">{currentOrder.quantity}</p>
                   </div>
                   
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-sm text-gray-600">Unit Price</p>
-                    <p className="text-lg font-semibold text-gray-900">${(order.unitPrice || 0).toLocaleString()}</p>
+                    <p className="text-lg font-semibold text-gray-900">${(currentOrder.unitPrice || 0).toLocaleString()}</p>
                   </div>
                   
                   <div className="bg-gray-50 rounded-lg p-4">
                     <p className="text-sm text-gray-600">Shipping</p>
-                    <p className="text-lg font-semibold text-gray-900">${(order.shippingCost || 0).toLocaleString()}</p>
+                    <p className="text-lg font-semibold text-gray-900">${(currentOrder.shippingCost || 0).toLocaleString()}</p>
                   </div>
                   
                   <div className="bg-green-50 rounded-lg p-4">
                     <p className="text-sm text-green-600">Total</p>
-                    <p className="text-lg font-bold text-green-700">${(order.finalAmount || 0).toLocaleString()}</p>
+                    <p className="text-lg font-bold text-green-700">${(currentOrder.finalAmount || 0).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Tracking Information */}
-            {order.trackingInfo?.trackingNumber && (
+            {currentOrder.trackingInfo?.trackingNumber && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
                   <Truck className="w-6 h-6 text-blue-600 mr-3" />
@@ -264,19 +247,19 @@ const AdminOrderDetailPage: React.FC = () => {
                     <MapPin className="w-5 h-5 text-blue-600" />
                     <div>
                       <p className="font-medium text-blue-900">
-                        Tracking Number: {order.trackingInfo.trackingNumber}
+                        Tracking Number: {currentOrder.trackingInfo.trackingNumber}
                       </p>
                       <p className="text-sm text-blue-700">
-                        Carrier: {order.trackingInfo.carrier}
+                        Carrier: {currentOrder.trackingInfo.carrier}
                       </p>
                     </div>
                   </div>
                   
-                  {order.trackingInfo.estimatedDelivery && (
+                  {currentOrder.trackingInfo.estimatedDelivery && (
                     <div className="flex items-center space-x-3">
                       <Calendar className="w-5 h-5 text-blue-600" />
                       <p className="text-sm text-blue-700">
-                        Estimated Delivery: {new Date(order.trackingInfo.estimatedDelivery).toLocaleDateString()}
+                        Estimated Delivery: {new Date(currentOrder.trackingInfo.estimatedDelivery).toLocaleDateString()}
                       </p>
                     </div>
                   )}
@@ -294,7 +277,7 @@ const AdminOrderDetailPage: React.FC = () => {
                 Customer Information
               </h2>
               
-              {order.userId ? (
+              {currentOrder.userId ? (
                 <div className="space-y-4">
                   <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                     <div className="flex items-center space-x-3">
@@ -306,28 +289,28 @@ const AdminOrderDetailPage: React.FC = () => {
                           Customer Name
                         </p>
                         <p className="text-lg font-bold text-gray-900">
-                          {order.userId.fullName || 'Unknown Customer'}
+                          {currentOrder.userId.fullName || 'Unknown Customer'}
                         </p>
                       </div>
                     </div>
                   </div>
                   
-                  {order.userId.email && (
+                  {currentOrder.userId.email && (
                     <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                       <Mail className="w-5 h-5 text-gray-500" />
                       <div className="flex-1">
                         <p className="text-sm text-gray-600">Email</p>
-                        <p className="font-medium text-gray-900">{order.userId.email}</p>
+                        <p className="font-medium text-gray-900">{currentOrder.userId.email}</p>
                       </div>
                     </div>
                   )}
                   
-                  {order.userId.phone && (
+                  {currentOrder.userId.phone && (
                     <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                       <Phone className="w-5 h-5 text-gray-500" />
                       <div className="flex-1">
                         <p className="text-sm text-gray-600">Phone</p>
-                        <p className="font-medium text-gray-900">{order.userId.phone}</p>
+                        <p className="font-medium text-gray-900">{currentOrder.userId.phone}</p>
                       </div>
                     </div>
                   )}
@@ -353,18 +336,22 @@ const AdminOrderDetailPage: React.FC = () => {
                   <div>
                     <p className="font-medium text-gray-900">Order Created</p>
                     <p className="text-sm text-gray-600">
-                      {new Date(order.createdAt).toLocaleDateString()} • {formatDistanceToNow(new Date(order.createdAt))} ago
+                      {currentOrder.createdAt && !isNaN(new Date(currentOrder.createdAt).getTime())
+                        ? `${new Date(currentOrder.createdAt).toLocaleDateString()} • ${formatDistanceToNow(new Date(currentOrder.createdAt))} ago`
+                        : 'Date not available'}
                     </p>
                   </div>
                 </div>
                 
-                {order.updatedAt && order.updatedAt !== order.createdAt && (
+                {currentOrder.updatedAt && currentOrder.updatedAt !== currentOrder.createdAt && (
                   <div className="flex items-center space-x-3">
                     <div className="w-3 h-3 bg-green-600 rounded-full"></div>
                     <div>
                       <p className="font-medium text-gray-900">Last Updated</p>
                       <p className="text-sm text-gray-600">
-                        {new Date(order.updatedAt).toLocaleDateString()} • {formatDistanceToNow(new Date(order.updatedAt))} ago
+                        {currentOrder.updatedAt && !isNaN(new Date(currentOrder.updatedAt).getTime())
+                          ? `${new Date(currentOrder.updatedAt).toLocaleDateString()} • ${formatDistanceToNow(new Date(currentOrder.updatedAt))} ago`
+                          : 'Date not available'}
                       </p>
                     </div>
                   </div>
@@ -373,7 +360,7 @@ const AdminOrderDetailPage: React.FC = () => {
             </div>
 
             {/* Order Notes */}
-            {(order as any).notes && (
+            {(currentOrder as any).notes && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
                   <FileText className="w-6 h-6 text-blue-600 mr-3" />
@@ -381,7 +368,7 @@ const AdminOrderDetailPage: React.FC = () => {
                 </h2>
                 
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-gray-700">{(order as any).notes}</p>
+                  <p className="text-gray-700">{(currentOrder as any).notes}</p>
                 </div>
               </div>
             )}

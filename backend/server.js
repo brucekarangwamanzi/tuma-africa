@@ -27,7 +27,8 @@ const limiter = rateLimit({
     if (process.env.NODE_ENV !== 'production') {
       return req.path.includes('/public/') || 
              req.path.includes('/products') ||
-             req.path.includes('/notifications/unread-count'); // Allow frequent polling of unread count
+             req.path.includes('/notifications/unread-count') ||
+             req.path.includes('/orders'); // Allow frequent requests to orders in development
     }
     return false;
   }

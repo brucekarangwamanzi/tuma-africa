@@ -19,45 +19,9 @@ import {
   Star,
   User
 } from 'lucide-react';
-import { useOrderStore } from '../store/orderStore';
+import { useOrderStore, getOrderId, Order } from '../store/orderStore';
 import { formatDistanceToNow } from 'date-fns';
 import ProductLocationMap from '../components/admin/ProductLocationMap';
-
-interface Order {
-  _id: string;
-  orderId: string;
-  productName: string;
-  productLink: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
-  shippingCost: number;
-  finalAmount: number;
-  status: string;
-  priority: string;
-  freightType?: 'sea' | 'air';
-  description?: string;
-  trackingInfo?: {
-    trackingNumber?: string;
-    carrier?: string;
-    estimatedDelivery?: string;
-    updates?: Array<{
-      status: string;
-      location: string;
-      timestamp: string;
-      description: string;
-    }>;
-  };
-  stageHistory?: Array<{
-    stage: string;
-    timestamp: string;
-    updatedBy?: string;
-    notes?: string;
-    attachments?: string[];
-  }>;
-  createdAt: string;
-  updatedAt: string;
-}
 
 const OrderDetailPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
@@ -75,7 +39,7 @@ const OrderDetailPage: React.FC = () => {
 
   const handleStatusUpdate = async (newStatus: string) => {
     if (!order) return;
-    await updateOrderStatus(order._id, newStatus);
+    await updateOrderStatus(getOrderId(order), newStatus);
   };
 
   const handleContactSupport = () => {
@@ -87,6 +51,22 @@ const OrderDetailPage: React.FC = () => {
       : `Hi, I need support regarding my order ${order.orderId}.`;
     
     navigate(`/messages?prefill=${encodeURIComponent(messageText)}`);
+  };
+
+  // Helper function to convert price to number (handles both string and number)
+  const getPriceNumber = (price: number | string | undefined): number => {
+    if (price === undefined || price === null) return 0;
+    if (typeof price === 'number') return price;
+    if (typeof price === 'string') {
+      const parsed = parseFloat(price);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
+  // Helper function to format price with 2 decimal places
+  const formatPrice = (price: number | string | undefined): string => {
+    return getPriceNumber(price).toFixed(2);
   };
 
   const handleDownloadInvoice = () => {
@@ -124,20 +104,20 @@ const OrderDetailPage: React.FC = () => {
           <table>
             <tr><td>Product Name:</td><td>${order.productName}</td></tr>
             <tr><td>Quantity:</td><td>${order.quantity}</td></tr>
-            <tr><td>Unit Price:</td><td>$${order.unitPrice.toFixed(2)}</td></tr>
-            <tr><td>Subtotal:</td><td>$${order.totalPrice.toFixed(2)}</td></tr>
-            <tr><td>Shipping:</td><td>$${order.shippingCost.toFixed(2)}</td></tr>
+            <tr><td>Unit Price:</td><td>$${formatPrice(order.unitPrice)}</td></tr>
+            <tr><td>Subtotal:</td><td>$${formatPrice(order.totalPrice)}</td></tr>
+            <tr><td>Shipping:</td><td>$${formatPrice(order.shippingCost)}</td></tr>
             <tr><td>Freight Type:</td><td>${order.freightType ? (order.freightType === 'sea' ? 'Sea Freight' : 'Air Freight') : 'N/A'}</td></tr>
             <tr><td>Status:</td><td>${order.status.charAt(0).toUpperCase() + order.status.slice(1)}</td></tr>
           </table>
         </div>
         
         <div class="total-section">
-          <div class="total-row">Total: $${order.finalAmount.toFixed(2)}</div>
+          <div class="total-row">Total: $${formatPrice(order.finalAmount)}</div>
         </div>
       </body>
       </html>
-    `;
+`;
 
     // Create blob and download
     const blob = new Blob([invoiceHTML], { type: 'text/html' });
