@@ -31,8 +31,9 @@ const router = express.Router();
 // @access  Private (Admin/Super Admin)
 router.get('/settings', authenticateToken, requireRole(['admin', 'super_admin']), async (req, res) => {
   try {
-    const settings = await AdminSettings.getSettings();
-    res.json({ settings });
+    const settingsDoc = await AdminSettings.getSettings();
+    // Return just the settings object, matching the frontend's expected format
+    res.json({ settings: settingsDoc.settings || {} });
 
   } catch (error) {
     console.error('Get admin settings error:', error);
@@ -47,29 +48,36 @@ router.post('/settings', authenticateToken, requireRole(['super_admin']), sensit
   try {
     let settings = await AdminSettings.findOne();
     
+    // Frontend sends the entire settings object directly, not nested under 'settings'
+    // Extract the actual settings data
+    let settingsData = req.body;
+    
+    // If settings are nested under 'settings' key, extract them
+    if (req.body.settings && typeof req.body.settings === 'object') {
+      settingsData = req.body.settings;
+    }
+    
     // Clean up advertisements - remove empty ones
-    if (req.body.advertisements) {
-      req.body.advertisements = req.body.advertisements.filter((ad) => 
+    if (settingsData.advertisements && Array.isArray(settingsData.advertisements)) {
+      settingsData.advertisements = settingsData.advertisements.filter((ad) => 
         ad && ad.title && ad.title.trim() !== ''
       );
     }
     
     if (!settings) {
+      // Create new settings record
       settings = await AdminSettings.create({
-        ...req.body,
+        settings: settingsData,
         lastUpdatedById: req.user.id,
         version: 1
       });
     } else {
-      // Deep merge the settings
-      const updatedSettings = { ...settings.settings };
-      Object.keys(req.body).forEach(key => {
-        if (key === 'settings' && typeof req.body[key] === 'object') {
-          Object.assign(updatedSettings, req.body[key]);
-        } else if (key !== 'settings') {
-          // Handle non-settings fields if any
-        }
-      });
+      // Deep merge the settings - merge new data into existing settings
+      const existingSettings = settings.settings || {};
+      const updatedSettings = {
+        ...existingSettings,
+        ...settingsData
+      };
 
       await settings.update({
         settings: updatedSettings,
@@ -84,7 +92,7 @@ router.post('/settings', authenticateToken, requireRole(['super_admin']), sensit
 
     res.json({
       message: 'Settings updated successfully',
-      settings
+      settings: settings.settings // Return just the settings object, not the whole model
     });
 
   } catch (error) {
