@@ -3,7 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-require('dotenv').config();
+// Load .env from backend directory (works whether running from root or backend)
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 

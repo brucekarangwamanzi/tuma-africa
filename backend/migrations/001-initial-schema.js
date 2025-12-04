@@ -372,7 +372,7 @@ module.exports = {
     // Create indexes for orders
     await queryInterface.addIndex('orders', ['user_id', 'status']);
     await queryInterface.addIndex('orders', ['order_id']);
-    await queryInterface.addIndex('orders', ['created_at']);
+    await queryInterface.addIndex('orders', ['createdAt']);
 
     // Create Chats table
     await queryInterface.createTable('chats', {
@@ -644,8 +644,8 @@ module.exports = {
     });
 
     // Create indexes for notifications
-    await queryInterface.addIndex('notifications', ['user_id', 'read', 'created_at']);
-    await queryInterface.addIndex('notifications', ['user_id', 'created_at']);
+    await queryInterface.addIndex('notifications', ['user_id', 'read', 'createdAt']);
+    await queryInterface.addIndex('notifications', ['user_id', 'createdAt']);
     await queryInterface.addIndex('notifications', ['expires_at']);
 
     // Create AdminSettings table

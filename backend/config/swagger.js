@@ -1,4 +1,6 @@
 const swaggerJsdoc = require('swagger-jsdoc');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const options = {
   definition: {
@@ -6,23 +8,19 @@ const options = {
     info: {
       title: 'Tuma-Africa Link Cargo API',
       version: '1.0.0',
-      description: 'Comprehensive API documentation for Tuma-Africa Link Cargo - A cargo and product ordering platform connecting African customers with Asian suppliers.',
+      description: 'API documentation for Tuma-Africa Link Cargo - A comprehensive cargo and product ordering platform connecting African customers with Asian suppliers.',
       contact: {
-        name: 'API Support',
-        email: 'support@tuma-africa.com'
-      },
-      license: {
-        name: 'MIT',
-        url: 'https://opensource.org/licenses/MIT'
+        name: 'Tuma-Africa Support',
+        email: 'support@tuma-africa-cargo.com'
       }
     },
     servers: [
       {
-        url: process.env.API_URL || 'http://localhost:5001/api',
+        url: process.env.API_URL || `http://localhost:${process.env.PORT || 5001}/api`,
         description: 'Development server'
       },
       {
-        url: 'https://tuma-africa-backend.onrender.com/api',
+        url: process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/api` : 'http://localhost:3000/api',
         description: 'Production server'
       }
     ],
@@ -32,25 +30,39 @@ const options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'Enter JWT token obtained from login endpoint'
+          description: 'Enter JWT token obtained from /auth/login endpoint'
         }
       },
       schemas: {
+        Error: {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+              description: 'Error message'
+            },
+            error: {
+              type: 'string',
+              description: 'Detailed error (only in development)'
+            }
+          }
+        },
         User: {
           type: 'object',
           properties: {
             id: {
               type: 'string',
+              format: 'uuid',
               description: 'User ID'
             },
             fullName: {
               type: 'string',
-              description: 'Full name of the user'
+              description: 'User full name'
             },
             email: {
               type: 'string',
               format: 'email',
-              description: 'User email address'
+              description: 'User email'
             },
             phone: {
               type: 'string',
@@ -67,146 +79,11 @@ const options = {
             },
             approved: {
               type: 'boolean',
-              description: 'Account approval status'
+              description: 'Admin approval status'
             },
             profileImage: {
               type: 'string',
               description: 'Profile image URL'
-            }
-          }
-        },
-        Product: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string',
-              description: 'Product ID'
-            },
-            name: {
-              type: 'string',
-              description: 'Product name'
-            },
-            description: {
-              type: 'string',
-              description: 'Product description'
-            },
-            price: {
-              type: 'number',
-              description: 'Product price'
-            },
-            originalPrice: {
-              type: 'number',
-              description: 'Original price before discount'
-            },
-            imageUrl: {
-              type: 'string',
-              description: 'Main product image URL'
-            },
-            images: {
-              type: 'array',
-              items: {
-                type: 'string'
-              },
-              description: 'Array of product image URLs'
-            },
-            category: {
-              type: 'string',
-              description: 'Product category'
-            },
-            subcategory: {
-              type: 'string',
-              description: 'Product subcategory'
-            },
-            featured: {
-              type: 'boolean',
-              description: 'Whether product is featured'
-            },
-            status: {
-              type: 'string',
-              enum: ['draft', 'published'],
-              description: 'Product status'
-            }
-          }
-        },
-        Order: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string',
-              description: 'Order ID'
-            },
-            orderId: {
-              type: 'string',
-              description: 'Custom order identifier'
-            },
-            userId: {
-              type: 'string',
-              description: 'User ID who placed the order'
-            },
-            productName: {
-              type: 'string',
-              description: 'Name of the product ordered'
-            },
-            productLink: {
-              type: 'string',
-              description: 'Link to the product'
-            },
-            quantity: {
-              type: 'number',
-              description: 'Quantity ordered'
-            },
-            unitPrice: {
-              type: 'number',
-              description: 'Price per unit'
-            },
-            totalPrice: {
-              type: 'number',
-              description: 'Total price (quantity * unitPrice)'
-            },
-            shippingCost: {
-              type: 'number',
-              description: 'Shipping cost'
-            },
-            finalAmount: {
-              type: 'number',
-              description: 'Final amount (totalPrice + shippingCost)'
-            },
-            status: {
-              type: 'string',
-              enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
-              description: 'Order status'
-            },
-            priority: {
-              type: 'string',
-              enum: ['low', 'normal', 'high', 'urgent'],
-              description: 'Order priority'
-            },
-            freightType: {
-              type: 'string',
-              enum: ['air', 'sea', 'land'],
-              description: 'Freight type'
-            }
-          }
-        },
-        Error: {
-          type: 'object',
-          properties: {
-            message: {
-              type: 'string',
-              description: 'Error message'
-            },
-            error: {
-              type: 'string',
-              description: 'Detailed error information (development only)'
-            }
-          }
-        },
-        Success: {
-          type: 'object',
-          properties: {
-            message: {
-              type: 'string',
-              description: 'Success message'
             }
           }
         }
@@ -215,31 +92,31 @@ const options = {
     tags: [
       {
         name: 'Authentication',
-        description: 'User authentication and authorization endpoints'
-      },
-      {
-        name: 'Users',
-        description: 'User profile management endpoints'
+        description: 'User authentication endpoints'
       },
       {
         name: 'Products',
-        description: 'Product catalog management endpoints'
+        description: 'Product management endpoints'
       },
       {
         name: 'Orders',
         description: 'Order management endpoints'
       },
       {
+        name: 'Users',
+        description: 'User profile endpoints'
+      },
+      {
         name: 'Chat',
-        description: 'Real-time chat and messaging endpoints'
+        description: 'Chat and messaging endpoints'
       },
       {
         name: 'Notifications',
-        description: 'Notification management endpoints'
+        description: 'Notification endpoints'
       },
       {
         name: 'Admin',
-        description: 'Admin dashboard and settings endpoints'
+        description: 'Admin management endpoints'
       },
       {
         name: 'Upload',
@@ -247,13 +124,13 @@ const options = {
       },
       {
         name: 'Public',
-        description: 'Public endpoints (no authentication required)'
+        description: 'Public endpoints'
       }
     ]
   },
   apis: [
-    './backend/routes/*.js',
-    './backend/server.js'
+    './routes/*.js',
+    './server.js'
   ]
 };
 

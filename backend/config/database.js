@@ -1,11 +1,12 @@
 const { Sequelize } = require('sequelize');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 // PostgreSQL connection configuration
 const sequelize = new Sequelize(
   process.env.POSTGRES_DB || 'tuma_africa_cargo',
   process.env.POSTGRES_USER || 'postgres',
-  process.env.POSTGRES_PASSWORD || 'postgres',
+  process.env.POSTGRES_PASSWORD || 'Serge123',
   {
     host: process.env.POSTGRES_HOST || 'localhost',
     port: process.env.POSTGRES_PORT || 5432,
