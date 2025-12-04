@@ -102,7 +102,33 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <button
+            onClick={() => navigate('/admin/cms')}
+            className="card hover:shadow-lg transition-shadow duration-200"
+          >
+            <div className="card-body flex items-center">
+              <Package className="w-8 h-8 text-blue-600 mr-3" />
+              <div className="text-left">
+                <p className="font-medium text-gray-900">CMS</p>
+                <p className="text-sm text-gray-600">Product management</p>
+              </div>
+            </div>
+          </button>
+          
+          <button
+            onClick={() => navigate('/admin/products')}
+            className="card hover:shadow-lg transition-shadow duration-200"
+          >
+            <div className="card-body flex items-center">
+              <Package className="w-8 h-8 text-purple-500 mr-3" />
+              <div className="text-left">
+                <p className="font-medium text-gray-900">Manage Products</p>
+                <p className="text-sm text-gray-600">View all products</p>
+              </div>
+            </div>
+          </button>
+          
           <button
             onClick={() => navigate('/admin/users')}
             className="card hover:shadow-lg transition-shadow duration-200"
@@ -125,19 +151,6 @@ const AdminDashboard: React.FC = () => {
               <div className="text-left">
                 <p className="font-medium text-gray-900">Manage Orders</p>
                 <p className="text-sm text-gray-600">Track and update orders</p>
-              </div>
-            </div>
-          </button>
-          
-          <button
-            onClick={() => navigate('/admin/products')}
-            className="card hover:shadow-lg transition-shadow duration-200"
-          >
-            <div className="card-body flex items-center">
-              <Package className="w-8 h-8 text-purple-500 mr-3" />
-              <div className="text-left">
-                <p className="font-medium text-gray-900">Manage Products</p>
-                <p className="text-sm text-gray-600">Add and edit products</p>
               </div>
             </div>
           </button>

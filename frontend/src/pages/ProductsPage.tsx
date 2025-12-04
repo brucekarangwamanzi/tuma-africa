@@ -5,7 +5,8 @@ import axios from 'axios';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 
 interface Product {
-  _id: string;
+  id?: string; // UUID from PostgreSQL
+  _id?: string; // Legacy MongoDB ID (for backward compatibility)
   name: string;
   description: string;
   price: number;
@@ -21,6 +22,21 @@ interface Product {
   };
   discountPercentage?: number;
 }
+
+// Helper function to get product ID
+const getProductId = (product: Product): string => {
+  return product.id || product._id || '';
+};
+
+// Helper function to safely convert price to number
+const getPriceNumber = (price: number | string): number => {
+  return typeof price === 'string' ? parseFloat(price) : price;
+};
+
+// Helper function to format price with 2 decimal places
+const formatPrice = (price: number | string): string => {
+  return getPriceNumber(price).toFixed(2);
+};
 
 interface ProductsResponse {
   products: Product[];
@@ -154,11 +170,11 @@ const ProductsPage: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
             <span className="text-lg font-bold text-primary-600">
-              ${product.price.toFixed(2)}
+              ${formatPrice(product.price)}
             </span>
-            {product.originalPrice && product.originalPrice > product.price && (
+            {product.originalPrice && getPriceNumber(product.originalPrice) > getPriceNumber(product.price) && (
               <span className="text-sm text-gray-500 line-through">
-                ${product.originalPrice.toFixed(2)}
+                ${formatPrice(product.originalPrice)}
               </span>
             )}
           </div>
@@ -175,13 +191,13 @@ const ProductsPage: React.FC = () => {
           
           <div className="flex space-x-2">
             <Link
-              to={`/products/${product._id}`}
+              to={`/products/${getProductId(product)}`}
               className="btn-outline btn-sm"
             >
               View Details
             </Link>
             <Link
-              to={`/products/${product._id}`}
+              to={`/products/${getProductId(product)}`}
               className="btn-primary btn-sm"
             >
               <ShoppingBag className="h-4 w-4 mr-1" />
@@ -352,7 +368,7 @@ const ProductsPage: React.FC = () => {
                 : 'space-y-4'
             }`}>
               {products.map((product) => (
-                <ProductCard key={product._id} product={product} />
+                <ProductCard key={getProductId(product)} product={product} />
               ))}
             </div>
 

@@ -1,7 +1,6 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const Order = require('../models/Order');
-const User = require('../models/User');
+const { Op } = require('sequelize');
+const { Order, User } = require('../models');
 const { authenticateToken, requireRole, requireApproval } = require('../middleware/auth');
 const { validateOrderCreation, validateOrderUpdate, validatePagination } = require('../middleware/validation');
 const { createOrderNotification } = require('../utils/notifications');
@@ -42,7 +41,7 @@ const router = express.Router();
  *                 enum: [low, normal, high, urgent]
  *               freightType:
  *                 type: string
- *                 enum: [air, sea, land]
+ *                 enum: [air, sea]
  *               description:
  *                 type: string
  *     responses:
@@ -76,10 +75,10 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
       finalAmount
     } = req.body;
 
-    const order = new Order({
-      userId: req.user._id,
+    const order = await Order.create({
+      userId: req.user.id,
       productName,
-      productLink,
+      productLink: productLink || '',
       quantity,
       unitPrice,
       totalPrice: totalPrice || (quantity * unitPrice),
@@ -87,15 +86,15 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
       finalAmount: finalAmount || ((quantity * unitPrice) + shippingCost),
       priority,
       freightType,
-      description,
+      description: description || '',
       shippingAddress: {
         fullName: req.user.fullName,
         phone: req.user.phone || '',
-        street: req.user.address?.street || '',
-        city: req.user.address?.city || '',
-        state: req.user.address?.state || '',
-        country: req.user.address?.country || '',
-        zipCode: req.user.address?.zipCode || ''
+        street: req.user.addressStreet || '',
+        city: req.user.addressCity || '',
+        state: req.user.addressState || '',
+        country: req.user.addressCountry || '',
+        zipCode: req.user.addressZipCode || ''
       },
       stageHistory: [{
         stage: 'pending',
@@ -104,8 +103,10 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
       }]
     });
 
-    await order.save();
-    await order.populate('userId', 'fullName email phone');
+    // Load user association
+    await order.reload({
+      include: [{ model: User, as: 'user', attributes: ['id', 'fullName', 'email', 'phone'] }]
+    });
 
     // Create notification for order creation
     try {
@@ -164,7 +165,7 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+ *           enum: [pending, processing, approved, purchased, warehouse, shipped, delivered, cancelled]
  *       - in: query
  *         name: priority
  *         schema:
@@ -195,42 +196,44 @@ router.get('/', authenticateToken, validatePagination, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
     
     const { status, priority, search } = req.query;
     
     // Build query based on user role
-    let query = {};
+    let where = {};
     
     if (req.user.role === 'user') {
-      query.userId = req.user._id;
+      where.userId = req.user.id;
     } else if (req.user.role === 'admin') {
       // Admin can see all orders or assigned orders
       if (req.query.assigned === 'true') {
-        query.assignedEmployee = req.user._id;
+        where.assignedEmployeeId = req.user.id;
       }
     }
     // Super admin can see all orders (no additional filter)
 
     // Apply filters
-    if (status) query.status = status;
-    if (priority) query.priority = priority;
+    if (status) where.status = status;
+    if (priority) where.priority = priority;
     if (search) {
-      query.$or = [
-        { orderId: { $regex: search, $options: 'i' } },
-        { productName: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+      where[Op.or] = [
+        { orderId: { [Op.iLike]: `%${search}%` } },
+        { productName: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } }
       ];
     }
 
-    const orders = await Order.find(query)
-      .populate('userId', 'fullName email phone')
-      .populate('assignedEmployee', 'fullName email')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Order.countDocuments(query);
+    const { count: total, rows: orders } = await Order.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'fullName', 'email', 'phone'] },
+        { model: User, as: 'assignedEmployeeUser', attributes: ['id', 'fullName', 'email'] }
+      ],
+      order: [['createdAt', 'DESC']],
+      offset,
+      limit
+    });
 
     res.json({
       orders,
@@ -283,25 +286,29 @@ router.get('/:orderId', authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     
-    // Try to find by MongoDB ObjectId first, then by custom orderId
-    let query = {};
+    // Try to find by UUID first, then by custom orderId
+    let where = {};
     
-    // Check if it's a valid MongoDB ObjectId
-    if (mongoose.Types.ObjectId.isValid(orderId)) {
-      query = { _id: orderId };
+    // Check if it's a valid UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(orderId)) {
+      where.id = orderId;
     } else {
-      query = { orderId };
+      where.orderId = orderId;
     }
     
     // Users can only see their own orders
     if (req.user.role === 'user') {
-      query.userId = req.user._id;
+      where.userId = req.user.id;
     }
 
-    const order = await Order.findOne(query)
-      .populate('userId', 'fullName email phone profileImage')
-      .populate('assignedEmployee', 'fullName email')
-      .populate('stageHistory.updatedBy', 'fullName');
+    const order = await Order.findOne({
+      where,
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'fullName', 'email', 'phone', 'profileImage'] },
+        { model: User, as: 'assignedEmployeeUser', attributes: ['id', 'fullName', 'email'] }
+      ]
+    });
 
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
@@ -338,7 +345,7 @@ router.get('/:orderId', authenticateToken, async (req, res) => {
  *             properties:
  *               status:
  *                 type: string
- *                 enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+ *                 enum: [pending, processing, approved, purchased, warehouse, shipped, delivered, cancelled]
  *               notes:
  *                 type: string
  *     responses:
@@ -355,15 +362,16 @@ router.put('/:orderId', authenticateToken, requireRole(['admin', 'super_admin'])
     const { orderId } = req.params;
     const updates = req.body;
 
-    // Try to find by MongoDB ObjectId first, then by custom orderId
-    let query = {};
-    if (mongoose.Types.ObjectId.isValid(orderId)) {
-      query = { _id: orderId };
+    // Try to find by UUID first, then by custom orderId
+    let where = {};
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(orderId)) {
+      where.id = orderId;
     } else {
-      query = { orderId };
+      where.orderId = orderId;
     }
 
-    const order = await Order.findOne(query);
+    const order = await Order.findOne({ where });
     
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
@@ -372,34 +380,36 @@ router.put('/:orderId', authenticateToken, requireRole(['admin', 'super_admin'])
     // Track status changes
     const oldStatus = order.status;
     
-    // Update order fields
-    Object.keys(updates).forEach(key => {
-      if (key !== 'stageHistory') {
-        order[key] = updates[key];
-      }
-    });
+    // Prepare update data
+    const updateData = { ...updates };
+    delete updateData.stageHistory; // Don't update stageHistory directly
 
     // Add stage history entry if status changed
     if (updates.status && updates.status !== oldStatus) {
-      order.stageHistory.push({
+      const stageHistory = order.stageHistory || [];
+      stageHistory.push({
         stage: updates.status,
         timestamp: new Date(),
-        updatedBy: req.user._id,
+        updatedBy: req.user.id,
         notes: updates.notes || `Status updated to ${updates.status}`
       });
+      updateData.stageHistory = stageHistory;
     }
 
     // Set assigned employee if not set
-    if (!order.assignedEmployee && req.user.role === 'admin') {
-      order.assignedEmployee = req.user._id;
+    if (!order.assignedEmployeeId && req.user.role === 'admin') {
+      updateData.assignedEmployeeId = req.user.id;
     }
 
-    await order.save();
-    await order.populate([
-      { path: 'userId', select: 'fullName email phone' },
-      { path: 'assignedEmployee', select: 'fullName email' },
-      { path: 'stageHistory.updatedBy', select: 'fullName' }
-    ]);
+    await order.update(updateData);
+    
+    // Reload with associations
+    await order.reload({
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'fullName', 'email', 'phone'] },
+        { model: User, as: 'assignedEmployeeUser', attributes: ['id', 'fullName', 'email'] }
+      ]
+    });
 
     // Create notification if status changed
     if (updates.status && updates.status !== oldStatus) {
@@ -430,32 +440,33 @@ router.post('/:orderId/notes', authenticateToken, requireRole(['admin', 'super_a
       return res.status(400).json({ message: 'Note text is required' });
     }
 
-    // Try to find by MongoDB ObjectId first, then by custom orderId
-    let query = {};
-    if (mongoose.Types.ObjectId.isValid(orderId)) {
-      query = { _id: orderId };
+    // Try to find by UUID first, then by custom orderId
+    let where = {};
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(orderId)) {
+      where.id = orderId;
     } else {
-      query = { orderId };
+      where.orderId = orderId;
     }
 
-    const order = await Order.findOne(query);
+    const order = await Order.findOne({ where });
     
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    order.notes.push({
+    const notes = order.notes || [];
+    notes.push({
       text: text.trim(),
-      createdBy: req.user._id,
+      createdBy: req.user.id,
       createdAt: new Date()
     });
 
-    await order.save();
-    await order.populate('notes.createdBy', 'fullName');
+    await order.update({ notes });
 
     res.json({
       message: 'Note added successfully',
-      note: order.notes[order.notes.length - 1]
+      note: notes[notes.length - 1]
     });
 
   } catch (error) {
@@ -476,33 +487,34 @@ router.put('/:orderId/status', authenticateToken, requireRole(['admin', 'super_a
       return res.status(400).json({ message: 'Status is required' });
     }
 
-    // Try to find by MongoDB ObjectId first, then by custom orderId
-    let query = {};
-    if (mongoose.Types.ObjectId.isValid(orderId)) {
-      query = { _id: orderId };
+    // Try to find by UUID first, then by custom orderId
+    let where = {};
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(orderId)) {
+      where.id = orderId;
     } else {
-      query = { orderId };
+      where.orderId = orderId;
     }
 
-    const order = await Order.findOne(query);
+    const order = await Order.findOne({ where });
     
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
 
     const oldStatus = order.status;
-    order.status = status;
-
-    // Add stage history entry
-    order.stageHistory.push({
+    const stageHistory = order.stageHistory || [];
+    stageHistory.push({
       stage: status,
       timestamp: new Date(),
-      updatedBy: req.user._id,
+      updatedBy: req.user.id,
       notes: `Status updated from ${oldStatus} to ${status}`
     });
 
-    await order.save();
-    await order.populate('userId', 'fullName email phone');
+    await order.update({ status, stageHistory });
+    await order.reload({
+      include: [{ model: User, as: 'user', attributes: ['id', 'fullName', 'email', 'phone'] }]
+    });
 
     // Create notification for status change
     const io = req.app.get('io');
@@ -546,21 +558,22 @@ router.delete('/:orderId', authenticateToken, async (req, res) => {
   try {
     const { orderId } = req.params;
     
-    // Try to find by MongoDB ObjectId first, then by custom orderId
-    let query = {};
-    if (mongoose.Types.ObjectId.isValid(orderId)) {
-      query = { _id: orderId };
+    // Try to find by UUID first, then by custom orderId
+    let where = {};
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(orderId)) {
+      where.id = orderId;
     } else {
-      query = { orderId };
+      where.orderId = orderId;
     }
     
     // Users can only cancel their own pending orders
     if (req.user.role === 'user') {
-      query.userId = req.user._id;
-      query.status = 'pending';
+      where.userId = req.user.id;
+      where.status = 'pending';
     }
 
-    const order = await Order.findOne(query);
+    const order = await Order.findOne({ where });
     
     if (!order) {
       return res.status(404).json({ 
@@ -572,14 +585,17 @@ router.delete('/:orderId', authenticateToken, async (req, res) => {
 
     if (req.user.role === 'user') {
       // Users can only cancel pending orders
-      order.status = 'cancelled';
-      order.stageHistory.push({
+      const stageHistory = order.stageHistory || [];
+      stageHistory.push({
         stage: 'cancelled',
         timestamp: new Date(),
         notes: 'Order cancelled by customer'
       });
-      await order.save();
-      await order.populate('userId', 'fullName email phone');
+      
+      await order.update({ status: 'cancelled', stageHistory });
+      await order.reload({
+        include: [{ model: User, as: 'user', attributes: ['id', 'fullName', 'email', 'phone'] }]
+      });
 
       // Create notification for cancellation
       const io = req.app.get('io');
@@ -588,7 +604,7 @@ router.delete('/:orderId', authenticateToken, async (req, res) => {
       res.json({ message: 'Order cancelled successfully' });
     } else {
       // Admins can delete orders
-      await Order.findByIdAndDelete(order._id);
+      await order.destroy();
       res.json({ message: 'Order deleted successfully' });
     }
 
@@ -603,44 +619,44 @@ router.delete('/:orderId', authenticateToken, async (req, res) => {
 // @access  Private (Admin/Super Admin)
 router.get('/stats/dashboard', authenticateToken, requireRole(['admin', 'super_admin']), async (req, res) => {
   try {
-    const stats = await Order.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          totalValue: { $sum: '$finalAmount' }
-        }
-      }
-    ]);
+    const { sequelize } = require('../models');
+    
+    // Get status stats
+    const statusStats = await Order.findAll({
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+        [sequelize.fn('SUM', sequelize.cast(sequelize.col('final_amount'), 'DECIMAL')), 'totalValue']
+      ],
+      group: ['status'],
+      raw: true
+    });
 
-    const recentOrders = await Order.find()
-      .populate('userId', 'fullName email')
-      .sort({ createdAt: -1 })
-      .limit(5);
+    const recentOrders = await Order.findAll({
+      include: [{ model: User, as: 'user', attributes: ['id', 'fullName', 'email'] }],
+      order: [['createdAt', 'DESC']],
+      limit: 5
+    });
 
-    const monthlyStats = await Order.aggregate([
-      {
-        $match: {
-          createdAt: {
-            $gte: new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)
-          }
+    // Get monthly stats for last 12 months
+    const monthlyStats = await Order.findAll({
+      attributes: [
+        [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+        [sequelize.fn('SUM', sequelize.cast(sequelize.col('final_amount'), 'DECIMAL')), 'revenue']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)
         }
       },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          count: { $sum: 1 },
-          revenue: { $sum: '$finalAmount' }
-        }
-      },
-      { $sort: { '_id.year': 1, '_id.month': 1 } }
-    ]);
+      group: [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
 
     res.json({
-      statusStats: stats,
+      statusStats,
       recentOrders,
       monthlyStats
     });

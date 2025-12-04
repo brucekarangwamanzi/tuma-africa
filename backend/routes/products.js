@@ -1,5 +1,6 @@
 const express = require('express');
-const Product = require('../models/Product');
+const { Op } = require('sequelize');
+const { Product, User, sequelize } = require('../models');
 const { authenticateToken, requireRole, optionalAuth } = require('../middleware/auth');
 const { validateProductCreation, validatePagination, validateSearch } = require('../middleware/validation');
 
@@ -246,56 +247,74 @@ router.get('/', optionalAuth, validatePagination, validateSearch, async (req, re
     // NEW BUSINESS LOGIC: Show all active products to all users
     // Products are visible by default when created
     // Only admins can change status to hide products
-    let query = { 
+    const where = { 
       isActive: true // Show all active products (visible to all users)
     };
     
-    if (category) query.category = { $regex: category, $options: 'i' };
-    if (subcategory) query.subcategory = { $regex: subcategory, $options: 'i' };
-    if (featured === 'true') query.featured = true;
+    if (category) where.category = { [Op.iLike]: `%${category}%` };
+    if (subcategory) where.subcategory = { [Op.iLike]: `%${subcategory}%` };
+    if (featured === 'true') where.featured = true;
     
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = parseFloat(minPrice);
-      if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+      where.price = {};
+      if (minPrice) where.price[Op.gte] = parseFloat(minPrice);
+      if (maxPrice) where.price[Op.lte] = parseFloat(maxPrice);
     }
     
     if (q) {
-      query.$text = { $search: q };
+      where[Op.or] = [
+        { name: { [Op.iLike]: `%${q}%` } },
+        { description: { [Op.iLike]: `%${q}%` } },
+        { tags: { [Op.contains]: [q] } }
+      ];
     }
 
-    // Build sort
-    let sort = {};
+    // Build sort order
+    let order = [];
     switch (sortBy) {
       case 'price_asc':
-        sort.price = 1;
+        order = [['price', 'ASC']];
         break;
       case 'price_desc':
-        sort.price = -1;
+        order = [['price', 'DESC']];
         break;
       case 'popular':
-        sort = { 'popularity.orders': -1, 'popularity.views': -1 };
+        order = [
+          [sequelize.literal("(popularity->>'orders')::int"), 'DESC'],
+          [sequelize.literal("(popularity->>'views')::int"), 'DESC']
+        ];
         break;
       case 'rating':
-        sort = { 'popularity.rating': -1 };
+        order = [[sequelize.literal("(popularity->>'rating')::float"), 'DESC']];
         break;
       case 'newest':
-        sort.createdAt = -1;
+        order = [['createdAt', 'DESC']];
         break;
       default:
-        sort = { featured: -1, 'popularity.orders': -1 };
+        order = [
+          ['featured', 'DESC'],
+          [sequelize.literal("(popularity->>'orders')::int"), 'DESC']
+        ];
     }
 
-    const products = await Product.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .select('-createdBy -lastUpdatedBy');
+    const { count, rows: products } = await Product.findAndCountAll({
+      where,
+      order,
+      offset: skip,
+      limit,
+      attributes: { exclude: ['createdById', 'lastUpdatedById'] }
+    });
 
-    const total = await Product.countDocuments(query);
+    const total = count;
 
     // Get categories for filtering (only published products)
-    const categories = await Product.distinct('category', query);
+    const categoryResults = await Product.findAll({
+      where,
+      attributes: ['category'],
+      group: ['category'],
+      raw: true
+    });
+    const categories = [...new Set(categoryResults.map(r => r.category))];
 
     res.json({
       products,
@@ -347,13 +366,18 @@ router.get('/featured', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 8;
     
-      const products = await Product.find({ 
-      featured: true,
-      isActive: true // Show all active featured products
-    })
-    .sort({ 'popularity.orders': -1, createdAt: -1 })
-    .limit(limit)
-    .select('name description price originalPrice imageUrl category popularity');
+    const products = await Product.findAll({ 
+      where: {
+        featured: true,
+        isActive: true // Show all active featured products
+      },
+      order: [
+        [sequelize.literal("(popularity->>'orders')::int"), 'DESC'],
+        ['createdAt', 'DESC']
+      ],
+      limit,
+      attributes: ['id', 'name', 'description', 'price', 'originalPrice', 'imageUrl', 'category', 'popularity']
+    });
 
     res.json({ products });
 
@@ -374,14 +398,17 @@ router.post('/by-ids', async (req, res) => {
       return res.status(400).json({ message: 'Product IDs array is required' });
     }
 
-    const products = await Product.find({
-      _id: { $in: productIds },
-      isActive: true // Show all active products
-    }).select('name description price originalPrice imageUrl category popularity');
+    const products = await Product.findAll({
+      where: {
+        id: { [Op.in]: productIds },
+        isActive: true // Show all active products
+      },
+      attributes: ['id', 'name', 'description', 'price', 'originalPrice', 'imageUrl', 'category', 'popularity']
+    });
 
     // Sort products in the order of the provided IDs
     const sortedProducts = productIds
-      .map(id => products.find(p => p._id.toString() === id))
+      .map(id => products.find(p => p.id === id))
       .filter(Boolean);
 
     res.json({ products: sortedProducts });
@@ -431,7 +458,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     console.log('   User Role:', userRole || 'None');
     
     // First, try to find the product without isActive filter (to check if it exists)
-    let product = await Product.findById(productId);
+    let product = await Product.findByPk(productId);
 
     if (!product) {
       console.log('❌ Product not found in database:', productId);
@@ -439,7 +466,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
 
     console.log('✅ Product found:', {
-      id: product._id,
+      id: product.id,
       name: product.name,
       isActive: product.isActive,
       status: product.status
@@ -457,8 +484,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     // Increment view count only for active products or admin views
     if (product.isActive || (req.user && ['admin', 'super_admin'].includes(userRole))) {
-      product.popularity.views += 1;
-      await product.save();
+      const popularity = product.popularity || {};
+      popularity.views = (popularity.views || 0) + 1;
+      await product.update({ popularity });
       console.log('📊 View count incremented');
     }
 
@@ -482,8 +510,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 // @route   POST /api/products
 // @desc    Create new product (visible to all users by default)
-// @access  Private (Super Admin only)
-router.post('/', authenticateToken, requireRole(['super_admin']), validateProductCreation, async (req, res) => {
+// @access  Private (Admin and Super Admin)
+router.post('/', authenticateToken, requireRole(['admin', 'super_admin']), validateProductCreation, async (req, res) => {
   try {
     console.log('📦 POST /api/products - Request received');
     console.log('👤 User:', req.user?.email, 'Role:', req.user?.role);
@@ -491,8 +519,8 @@ router.post('/', authenticateToken, requireRole(['super_admin']), validateProduc
     
     const productData = {
       ...req.body,
-      createdBy: req.user._id,
-      lastUpdatedBy: req.user._id
+      createdById: req.user.id,
+      lastUpdatedById: req.user.id
     };
 
     // Handle status field - map to isActive
@@ -537,14 +565,22 @@ router.post('/', authenticateToken, requireRole(['super_admin']), validateProduc
 
     console.log('💾 Product data to save:', JSON.stringify(productData, null, 2));
 
-    const product = new Product(productData);
-    await product.save();
+    const product = await Product.create(productData, {
+      include: [
+        { model: User, as: 'creator', attributes: ['id', 'fullName', 'email'] },
+        { model: User, as: 'lastUpdater', attributes: ['id', 'fullName', 'email'] }
+      ]
+    });
 
-    console.log('✅ Product saved to database:', product._id);
+    console.log('✅ Product saved to database:', product.id);
 
-    // Populate createdBy and lastUpdatedBy for response
-    await product.populate('createdBy', 'fullName email');
-    await product.populate('lastUpdatedBy', 'fullName email');
+    // Reload with associations for response
+    await product.reload({
+      include: [
+        { model: User, as: 'creator', attributes: ['id', 'fullName', 'email'] },
+        { model: User, as: 'lastUpdater', attributes: ['id', 'fullName', 'email'] }
+      ]
+    });
 
     console.log('✅ Product populated and ready to send');
 
@@ -634,7 +670,7 @@ router.put('/:id', authenticateToken, requireRole(['admin', 'super_admin']), val
     
     const updates = {
       ...req.body,
-      lastUpdatedBy: req.user._id
+      lastUpdatedById: req.user.id
     };
 
     // Ensure price is a number
@@ -653,22 +689,24 @@ router.put('/:id', authenticateToken, requireRole(['admin', 'super_admin']), val
 
     console.log('💾 Updates to apply:', JSON.stringify(updates, null, 2));
 
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      updates,
-      { new: true, runValidators: true }
-    );
+    const product = await Product.findByPk(req.params.id);
 
     if (!product) {
       console.error('❌ Product not found:', req.params.id);
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    console.log('✅ Product updated in database:', product._id);
+    await product.update(updates);
 
-    // Populate createdBy and lastUpdatedBy for response
-    await product.populate('createdBy', 'fullName email');
-    await product.populate('lastUpdatedBy', 'fullName email');
+    console.log('✅ Product updated in database:', product.id);
+
+    // Reload with associations for response
+    await product.reload({
+      include: [
+        { model: User, as: 'creator', attributes: ['id', 'fullName', 'email'] },
+        { model: User, as: 'lastUpdater', attributes: ['id', 'fullName', 'email'] }
+      ]
+    });
 
     console.log('✅ Product populated and ready to send');
 
@@ -768,21 +806,26 @@ router.put('/:id/status', authenticateToken, requireRole(['admin', 'super_admin'
       });
     }
 
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findByPk(req.params.id);
     
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
     // Update status and isActive
-    product.status = status;
-    product.isActive = status === 'published';
-    product.lastUpdatedBy = req.user._id;
+    await product.update({
+      status,
+      isActive: status === 'published',
+      lastUpdatedById: req.user.id
+    });
     
-    await product.save();
-    await product.populate('lastUpdatedBy', 'fullName email');
+    await product.reload({
+      include: [
+        { model: User, as: 'lastUpdater', attributes: ['id', 'fullName', 'email'] }
+      ]
+    });
 
-    console.log(`✅ Product ${product._id} status changed to ${status} by ${req.user.email}`);
+    console.log(`✅ Product ${product.id} status changed to ${status} by ${req.user.email}`);
 
     res.json({
       message: `Product status changed to ${status}`,
@@ -798,16 +841,16 @@ router.put('/:id/status', authenticateToken, requireRole(['admin', 'super_admin'
 // @route   DELETE /api/products/:id
 // @desc    Delete product (Super Admin only)
 // @access  Private (Super Admin only)
-router.delete('/:id', authenticateToken, requireRole(['super_admin']), async (req, res) => {
+router.delete('/:id', authenticateToken, requireRole(['admin', 'super_admin']), async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findByPk(req.params.id);
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
     // Actually delete the product from database
-    await Product.findByIdAndDelete(req.params.id);
+    await product.destroy();
 
     res.json({ message: 'Product deleted successfully' });
 
@@ -822,15 +865,16 @@ router.delete('/:id', authenticateToken, requireRole(['super_admin']), async (re
 // @access  Private (Admin/Super Admin)
 router.post('/:id/toggle-featured', authenticateToken, requireRole(['admin', 'super_admin']), async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findByPk(req.params.id);
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    product.featured = !product.featured;
-    product.lastUpdatedBy = req.user._id;
-    await product.save();
+    await product.update({
+      featured: !product.featured,
+      lastUpdatedById: req.user.id
+    });
 
     res.json({
       message: `Product ${product.featured ? 'featured' : 'unfeatured'} successfully`,
@@ -844,9 +888,9 @@ router.post('/:id/toggle-featured', authenticateToken, requireRole(['admin', 'su
 });
 
 // @route   GET /api/products/admin/all
-// @desc    Get all products for super admin (including inactive)
-// @access  Private (Super Admin only)
-router.get('/admin/all', authenticateToken, requireRole(['super_admin']), async (req, res) => {
+// @desc    Get all products for admin (including inactive)
+// @access  Private (Admin and Super Admin)
+router.get('/admin/all', authenticateToken, requireRole(['admin', 'super_admin']), async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     // Allow higher limit for admin (up to 1000)
@@ -855,45 +899,60 @@ router.get('/admin/all', authenticateToken, requireRole(['super_admin']), async 
     
     const { category, featured, isActive, q } = req.query;
     
-    let query = {};
+    const where = {};
     
-    if (category) query.category = { $regex: category, $options: 'i' };
-    if (featured !== undefined) query.featured = featured === 'true';
-    if (isActive !== undefined) query.isActive = isActive === 'true';
+    if (category) where.category = { [Op.iLike]: `%${category}%` };
+    if (featured !== undefined) where.featured = featured === 'true';
+    if (isActive !== undefined) where.isActive = isActive === 'true';
     
     if (q) {
-      query.$or = [
-        { name: { $regex: q, $options: 'i' } },
-        { description: { $regex: q, $options: 'i' } },
-        { category: { $regex: q, $options: 'i' } }
+      where[Op.or] = [
+        { name: { [Op.iLike]: `%${q}%` } },
+        { description: { [Op.iLike]: `%${q}%` } },
+        { category: { [Op.iLike]: `%${q}%` } }
       ];
     }
 
-    const products = await Product.find(query)
-      .populate('createdBy', 'fullName')
-      .populate('lastUpdatedBy', 'fullName')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const { count: total, rows: products } = await Product.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'creator', attributes: ['id', 'fullName'] },
+        { model: User, as: 'lastUpdater', attributes: ['id', 'fullName'] }
+      ],
+      order: [['createdAt', 'DESC']],
+      offset: skip,
+      limit
+    });
 
-    const total = await Product.countDocuments(query);
+    // Calculate stats using Sequelize
+    const allProducts = await Product.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+        [sequelize.fn('SUM', sequelize.literal("CASE WHEN \"is_active\" = true THEN 1 ELSE 0 END")), 'active'],
+        [sequelize.fn('SUM', sequelize.literal("CASE WHEN \"featured\" = true THEN 1 ELSE 0 END")), 'featured'],
+        [sequelize.fn('SUM', sequelize.literal("(popularity->>'views')::int")), 'totalViews'],
+        [sequelize.fn('SUM', sequelize.literal("(popularity->>'orders')::int")), 'totalOrders']
+      ],
+      raw: true
+    });
 
-    const stats = await Product.aggregate([
-      {
-        $group: {
-          _id: null,
-          total: { $sum: 1 },
-          active: { $sum: { $cond: ['$isActive', 1, 0] } },
-          featured: { $sum: { $cond: ['$featured', 1, 0] } },
-          totalViews: { $sum: '$popularity.views' },
-          totalOrders: { $sum: '$popularity.orders' }
-        }
-      }
-    ]);
+    const stats = allProducts[0] || {
+      total: 0,
+      active: 0,
+      featured: 0,
+      totalViews: 0,
+      totalOrders: 0
+    };
 
     res.json({
       products,
-      stats: stats[0] || {},
+      stats: {
+        total: parseInt(stats.total) || 0,
+        active: parseInt(stats.active) || 0,
+        featured: parseInt(stats.featured) || 0,
+        totalViews: parseInt(stats.totalViews) || 0,
+        totalOrders: parseInt(stats.totalOrders) || 0
+      },
       pagination: {
         current: page,
         pages: Math.ceil(total / limit),

@@ -3,7 +3,8 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 
 export interface Notification {
-  _id: string;
+  id?: string; // PostgreSQL UUID
+  _id?: string; // MongoDB ObjectId (for backward compatibility)
   userId: string;
   type: string;
   title: string;
@@ -18,6 +19,11 @@ export interface Notification {
   createdAt: string;
   updatedAt: string;
 }
+
+// Helper function to get notification ID (supports both id and _id)
+export const getNotificationId = (notification: Notification): string => {
+  return notification.id || notification._id || '';
+};
 
 interface NotificationState {
   notifications: Notification[];
@@ -106,7 +112,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
       
       set({
         notifications: get().notifications.map(n => 
-          n._id === id ? { ...n, read: true, readAt: new Date().toISOString() } : n
+          getNotificationId(n) === id ? { ...n, read: true, readAt: new Date().toISOString() } : n
         ),
         unreadCount: Math.max(0, get().unreadCount - 1),
         isMarkingRead: false,
@@ -144,9 +150,9 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
     try {
       await axios.delete(`/notifications/${id}`);
       
-      const notification = get().notifications.find(n => n._id === id);
+      const notification = get().notifications.find(n => getNotificationId(n) === id);
       set({
-        notifications: get().notifications.filter(n => n._id !== id),
+        notifications: get().notifications.filter(n => getNotificationId(n) !== id),
         unreadCount: notification && !notification.read 
           ? Math.max(0, get().unreadCount - 1) 
           : get().unreadCount,

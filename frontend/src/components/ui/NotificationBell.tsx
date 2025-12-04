@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Check, CheckCheck, Trash2, X, ExternalLink } from 'lucide-react';
-import { useNotificationStore } from '../../store/notificationStore';
+import { useNotificationStore, getNotificationId } from '../../store/notificationStore';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -58,7 +58,7 @@ const NotificationBell: React.FC = () => {
             body: notification.message || '',
             icon: '/favicon.ico',
             badge: '/favicon.ico',
-            tag: notification._id, // Prevent duplicate notifications
+            tag: getNotificationId(notification), // Prevent duplicate notifications
             requireInteraction: notification.priority === 'high' || notification.priority === 'urgent'
           });
           
@@ -152,7 +152,7 @@ const NotificationBell: React.FC = () => {
 
   const handleNotificationClick = async (notification: any) => {
     if (!notification.read) {
-      await markAsRead(notification._id);
+      await markAsRead(getNotificationId(notification));
     }
 
     setIsOpen(false);
@@ -311,7 +311,7 @@ const NotificationBell: React.FC = () => {
               <div className="divide-y divide-gray-100">
                 {notifications.map((notification) => (
                   <div
-                    key={notification._id}
+                    key={getNotificationId(notification)}
                     onClick={() => handleNotificationClick(notification)}
                     className={`p-4 sm:p-5 cursor-pointer active:bg-gray-100 hover:bg-gray-50 transition-colors border-l-4 ${getPriorityColor(notification.priority)} ${
                       !notification.read ? 'bg-blue-50' : ''
@@ -336,7 +336,9 @@ const NotificationBell: React.FC = () => {
                           </p>
                           <div className="flex items-center justify-between mt-2 sm:mt-3 gap-2">
                             <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
-                              {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                              {notification.createdAt && !isNaN(new Date(notification.createdAt).getTime())
+                                ? formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })
+                                : 'Just now'}
                             </span>
                             {notification.link && (
                               <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
@@ -349,7 +351,7 @@ const NotificationBell: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              markAsRead(notification._id);
+                              markAsRead(getNotificationId(notification));
                             }}
                             className="p-2 sm:p-2.5 text-gray-400 hover:text-primary-600 active:bg-gray-200 rounded-lg transition-colors touch-manipulation"
                             title="Mark as read"
@@ -359,7 +361,7 @@ const NotificationBell: React.FC = () => {
                           </button>
                         )}
                         <button
-                          onClick={(e) => handleDelete(e, notification._id)}
+                          onClick={(e) => handleDelete(e, getNotificationId(notification))}
                           className="p-2 sm:p-2.5 text-gray-400 hover:text-red-600 active:bg-red-50 rounded-lg transition-colors touch-manipulation"
                           title="Delete"
                           aria-label="Delete notification"

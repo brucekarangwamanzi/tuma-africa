@@ -39,7 +39,7 @@ interface Chat {
     productName: string;
     status: string;
   };
-  messages: Array<{
+  messages?: Array<{
     _id: string;
     sender: string;
     type: string;
@@ -126,6 +126,20 @@ const ChatManagementPage: React.FC = () => {
       toast.error('Failed to load chats');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchChatMessages = async (chatId: string) => {
+    try {
+      const response = await axios.get(`/chat/messages?chatId=${chatId}`);
+      if (response.data.messages && selectedChat && selectedChat._id === chatId) {
+        setSelectedChat({
+          ...selectedChat,
+          messages: response.data.messages
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
     }
   };
 
@@ -391,7 +405,13 @@ const ChatManagementPage: React.FC = () => {
                     return (
                       <div
                         key={chat._id}
-                        onClick={() => setSelectedChat(chat)}
+                        onClick={() => {
+                          setSelectedChat(chat);
+                          // Fetch messages for the selected chat
+                          if (!chat.messages || chat.messages.length === 0) {
+                            fetchChatMessages(chat._id);
+                          }
+                        }}
                         className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 ${
                           selectedChat?._id === chat._id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
                         }`}
@@ -420,8 +440,11 @@ const ChatManagementPage: React.FC = () => {
                           {user?.email}
                         </p>
                         <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>{chat.messages.length} messages</span>
-                          <span>{formatDistanceToNow(new Date(chat.updatedAt), { addSuffix: true })}</span>
+                          <span>{(chat.messages?.length || 0)} messages</span>
+                          <span>{chat.updatedAt && !isNaN(new Date(chat.updatedAt).getTime()) 
+                            ? formatDistanceToNow(new Date(chat.updatedAt), { addSuffix: true })
+                            : 'Just now'}
+                          </span>
                         </div>
                       </div>
                     );
@@ -518,7 +541,8 @@ const ChatManagementPage: React.FC = () => {
 
                 {/* Messages */}
                 <div className="p-4 h-96 overflow-y-auto space-y-4">
-                  {selectedChat.messages.map((message) => {
+                  {selectedChat.messages && selectedChat.messages.length > 0 ? (
+                    selectedChat.messages.map((message) => {
                     const isAdmin = message.sender !== selectedChat.participants.find(p => p.role === 'user')?._id;
                     const sender = selectedChat.participants.find(p => p._id === message.sender);
                     const senderName = sender?.fullName || 'Unknown';
@@ -543,14 +567,24 @@ const ChatManagementPage: React.FC = () => {
                           >
                             <p className="text-sm leading-relaxed">{message.text}</p>
                             <div className="flex items-center justify-between mt-2 text-xs opacity-75">
-                              <span>{formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}</span>
+                              <span>
+                                {message.createdAt && !isNaN(new Date(message.createdAt).getTime())
+                                  ? formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })
+                                  : 'Just now'}
+                              </span>
                               {isAdmin && message.isRead && <CheckCircle className="w-3 h-3" />}
                             </div>
                           </div>
                         </div>
                       </div>
                     );
-                  })}
+                    })
+                  ) : (
+                    <div className="text-center text-gray-500 py-8">
+                      <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No messages yet. Start the conversation!</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Message Input */}

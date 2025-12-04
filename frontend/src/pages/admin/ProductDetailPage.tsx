@@ -19,7 +19,7 @@ import {
   CheckCircle,
   ExternalLink
 } from 'lucide-react';
-import { useProductStore } from '../../store/productStore';
+import { useProductStore, getProductId } from '../../store/productStore';
 import { formatDistanceToNow } from 'date-fns';
 
 const ProductDetailPage: React.FC = () => {
@@ -47,15 +47,26 @@ const ProductDetailPage: React.FC = () => {
   const handleDelete = async () => {
     if (!product) return;
     
+    const productId = getProductId(product);
+    if (!productId) {
+      console.error('Product ID not found');
+      return;
+    }
+    
     if (window.confirm(`Are you sure you want to delete "${product.name}"?`)) {
-      await deleteProduct(product._id);
+      await deleteProduct(productId);
       navigate('/admin/products');
     }
   };
 
   const handleToggleFeatured = async () => {
     if (!product) return;
-    await toggleFeatured(product._id);
+    const productId = getProductId(product);
+    if (!productId) {
+      console.error('Product ID not found');
+      return;
+    }
+    await toggleFeatured(productId);
   };
 
   if (isLoading) {
@@ -127,7 +138,7 @@ const ProductDetailPage: React.FC = () => {
               </button>
               
               <Link
-                to={`/admin/products/${product._id}/edit`}
+                to={`/admin/products/${getProductId(product)}/edit`}
                 className="flex items-center px-4 py-2 bg-green-100 text-green-800 hover:bg-green-200 rounded-xl transition-colors"
               >
                 <Edit className="w-4 h-4 mr-2" />

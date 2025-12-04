@@ -5,7 +5,8 @@ import { toast } from 'react-toastify';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface Product {
-  _id: string;
+  id?: string; // UUID from PostgreSQL
+  _id?: string; // Legacy MongoDB ID (for backward compatibility)
   name: string;
   description: string;
   price: number;
@@ -13,6 +14,11 @@ interface Product {
   category: string;
   isActive: boolean;
 }
+
+// Helper function to get product ID
+const getProductId = (product: Product): string => {
+  return product.id || product._id || '';
+};
 
 interface ProductsSectionManagerProps {
   register: any;
@@ -177,12 +183,12 @@ const ProductsSectionManager: React.FC<ProductsSectionManagerProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 {selectedProducts.map((product) => (
                   <div
-                    key={product._id}
+                    key={getProductId(product)}
                     className="relative border rounded-lg p-4 hover:shadow-md transition-shadow"
                   >
                     <button
                       type="button"
-                      onClick={() => removeProduct(product._id)}
+                      onClick={() => removeProduct(getProductId(product))}
                       className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
                     >
                       <X className="w-4 h-4" />
@@ -247,11 +253,12 @@ const ProductsSectionManager: React.FC<ProductsSectionManagerProps> = ({
                     ) : filteredProducts.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {filteredProducts.map((product) => {
-                          const isSelected = featuredProducts.includes(product._id);
+                          const productId = getProductId(product);
+                          const isSelected = featuredProducts.includes(productId);
                           return (
                             <div
-                              key={product._id}
-                              onClick={() => toggleProductSelection(product._id)}
+                              key={productId}
+                              onClick={() => toggleProductSelection(productId)}
                               className={`relative border rounded-lg p-4 cursor-pointer transition-all ${
                                 isSelected
                                   ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500'

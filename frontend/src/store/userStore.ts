@@ -3,7 +3,8 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 
 interface User {
-  _id: string;
+  id?: string; // PostgreSQL UUID
+  _id?: string; // MongoDB ObjectId (for backward compatibility)
   fullName: string;
   email: string;
   phone?: string;
@@ -24,6 +25,11 @@ interface User {
   updatedAt: string;
   lastLogin?: string;
 }
+
+// Helper function to get user ID (supports both id and _id)
+export const getUserId = (user: User): string => {
+  return user.id || user._id || '';
+};
 
 interface UsersResponse {
   users: User[];
@@ -132,12 +138,12 @@ export const useUserStore = create<UserState>((set, get) => ({
       // Update user in list
       const { users, currentUser } = get();
       const updatedUsers = users.map(user =>
-        user._id === userId ? { ...user, approved } : user
+        getUserId(user) === userId ? { ...user, approved } : user
       );
       
       set({
         users: updatedUsers,
-        currentUser: currentUser?._id === userId 
+        currentUser: currentUser && getUserId(currentUser) === userId 
           ? { ...currentUser, approved } 
           : currentUser,
         isSubmitting: false
@@ -164,12 +170,12 @@ export const useUserStore = create<UserState>((set, get) => ({
       // Update user in list
       const { users, currentUser } = get();
       const updatedUsers = users.map(user =>
-        user._id === userId ? { ...user, role: role as User['role'] } : user
+        getUserId(user) === userId ? { ...user, role: role as User['role'] } : user
       );
       
       set({
         users: updatedUsers,
-        currentUser: currentUser?._id === userId 
+        currentUser: currentUser && getUserId(currentUser) === userId 
           ? { ...currentUser, role: role as User['role'] } 
           : currentUser,
         isSubmitting: false
@@ -196,7 +202,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       // Update user in list (mark as inactive)
       const { users } = get();
       const updatedUsers = users.map(user =>
-        user._id === userId ? { ...user, isActive: false } : user
+        getUserId(user) === userId ? { ...user, isActive: false } : user
       );
       
       set({

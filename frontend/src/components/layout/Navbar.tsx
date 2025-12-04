@@ -36,7 +36,9 @@ const Navbar: React.FC = () => {
 
   const adminItems = [
     { name: 'Admin Dashboard', href: '/admin', icon: Settings },
-    { name: 'CMS', href: '/admin/settings', icon: Settings, superAdminOnly: true },
+    { name: 'CMS', href: '/admin/cms', icon: Package },
+    { name: 'Products', href: '/admin/products', icon: Package },
+    { name: 'Settings', href: '/admin/settings', icon: Settings, superAdminOnly: true },
   ];
 
   return (

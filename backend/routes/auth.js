@@ -1,7 +1,8 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const User = require('../models/User');
+const { Op } = require('sequelize');
+const { User } = require('../models');
 const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
 const { authenticateToken } = require('../middleware/auth');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
@@ -119,7 +120,9 @@ router.post('/register', validateUserRegistration, async (req, res) => {
 
     // Check if user already exists
     const existingUser = await User.findOne({ 
-      $or: [{ email }, { phone }] 
+      where: {
+        [Op.or]: [{ email }, { phone }]
+      }
     });
 
     if (existingUser) {
@@ -131,11 +134,11 @@ router.post('/register', validateUserRegistration, async (req, res) => {
     }
 
     // Create new user
-    const user = new User({
+    const user = await User.create({
       fullName,
       email,
       phone,
-      passwordHash: password, // Will be hashed by pre-save middleware
+      passwordHash: password, // Will be hashed by pre-save hook
       currency: currency || 'USD', // Default to USD if not provided
       role: 'user',
       verified: false,
@@ -147,10 +150,11 @@ router.post('/register', validateUserRegistration, async (req, res) => {
     const verificationExpires = new Date();
     verificationExpires.setHours(verificationExpires.getHours() + 24); // 24 hours expiry
 
-    user.emailVerificationToken = verificationToken;
-    user.emailVerificationExpires = verificationExpires;
-
-    await user.save();
+    // Update user with verification token
+    await user.update({
+      emailVerificationToken: verificationToken,
+      emailVerificationExpires: verificationExpires
+    });
 
     // Send verification email
     let emailSent = false;
@@ -179,11 +183,10 @@ router.post('/register', validateUserRegistration, async (req, res) => {
     }
 
     // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
+    const { accessToken, refreshToken } = generateTokens(user.id, user.role);
     
     // Save refresh token
-    user.refreshToken = refreshToken;
-    await user.save();
+    await user.update({ refreshToken });
 
     const responseMessage = emailSent 
       ? 'Registration successful! Please check your email to verify your account.'
@@ -192,7 +195,7 @@ router.post('/register', validateUserRegistration, async (req, res) => {
     const response = {
       message: responseMessage,
       user: {
-        id: user._id,
+        id: user.id,
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
@@ -294,8 +297,10 @@ router.post('/login', validateUserLogin, async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user by email
-    const user = await User.findOne({ email }).select('+passwordHash');
+    // Find user by email (with password hash)
+    const user = await User.scope('withPassword').findOne({ 
+      where: { email }
+    });
     
     if (!user) {
       return res.status(401).json({ message: 'Invalid email or password' });
@@ -314,17 +319,18 @@ router.post('/login', validateUserLogin, async (req, res) => {
     }
 
     // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
+    const { accessToken, refreshToken } = generateTokens(user.id, user.role);
     
     // Update refresh token and last login
-    user.refreshToken = refreshToken;
-    user.lastLogin = new Date();
-    await user.save();
+    await user.update({
+      refreshToken: refreshToken,
+      lastLogin: new Date()
+    });
 
     res.json({
       message: 'Login successful',
       user: {
-        id: user._id,
+        id: user.id,
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
@@ -395,18 +401,17 @@ router.post('/refresh', async (req, res) => {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     
     // Find user and verify refresh token
-    const user = await User.findById(decoded.userId);
+    const user = await User.findByPk(decoded.userId);
     
     if (!user || user.refreshToken !== refreshToken || !user.isActive) {
       return res.status(403).json({ message: 'Invalid refresh token' });
     }
 
     // Generate new tokens
-    const tokens = generateTokens(user._id, user.role);
+    const tokens = generateTokens(user.id, user.role);
     
     // Update refresh token
-    user.refreshToken = tokens.refreshToken;
-    await user.save();
+    await user.update({ refreshToken: tokens.refreshToken });
 
     res.json({
       message: 'Token refreshed successfully',
@@ -454,9 +459,10 @@ router.post('/refresh', async (req, res) => {
 router.post('/logout', authenticateToken, async (req, res) => {
   try {
     // Clear refresh token
-    await User.findByIdAndUpdate(req.user._id, { 
-      $unset: { refreshToken: 1 } 
-    });
+    await User.update(
+      { refreshToken: null },
+      { where: { id: req.user.id } }
+    );
 
     res.json({ message: 'Logout successful' });
 
@@ -519,13 +525,17 @@ router.post('/logout', authenticateToken, async (req, res) => {
 // @access  Private
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select('-passwordHash -refreshToken')
-      .populate('address');
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ['passwordHash', 'refreshToken'] }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     res.json({
       user: {
-        id: user._id,
+        id: user.id,
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
@@ -574,7 +584,7 @@ router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ where: { email } });
     
     if (!user) {
       // Don't reveal if email exists
@@ -585,7 +595,7 @@ router.post('/forgot-password', async (req, res) => {
 
     // Generate reset token
     const resetToken = jwt.sign(
-      { userId: user._id, purpose: 'password-reset' },
+      { userId: user.id, purpose: 'password-reset' },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -656,15 +666,17 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Find user and update password
-    const user = await User.findById(decoded.userId);
+    const user = await User.findByPk(decoded.userId);
     
     if (!user) {
       return res.status(400).json({ message: 'Invalid reset token' });
     }
 
-    user.passwordHash = newPassword; // Will be hashed by pre-save middleware
-    user.refreshToken = undefined; // Invalidate all sessions
-    await user.save();
+    // Update password (will be hashed by pre-save hook) and invalidate sessions
+    await user.update({
+      passwordHash: newPassword,
+      refreshToken: null
+    });
 
     res.json({ message: 'Password reset successful' });
 

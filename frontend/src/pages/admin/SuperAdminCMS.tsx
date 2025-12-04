@@ -6,7 +6,6 @@ import axios from 'axios';
 import { useSettingsStore, AdminSettings } from '../../store/settingsStore';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import ProductsSectionManager from '../../components/admin/ProductsSectionManager';
-import ProductManagementCMS from '../../components/admin/ProductManagementCMS';
 
 const SuperAdminCMS: React.FC = () => {
   const { settings, updateSettings, isUpdating } = useSettingsStore();
@@ -88,7 +87,6 @@ const SuperAdminCMS: React.FC = () => {
     { id: 'hero', label: 'Hero Section', icon: Image },
     { id: 'advertisements', label: 'Advertisements', icon: Settings },
     { id: 'products', label: 'Products Section', icon: Settings },
-    { id: 'product-management', label: 'Product Management', icon: Plus },
     { id: 'theme', label: 'Theme & Colors', icon: Palette },
     { id: 'company', label: 'Company Info', icon: Type },
     { id: 'social', label: 'Social Links', icon: Settings },
@@ -165,11 +163,7 @@ const SuperAdminCMS: React.FC = () => {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            {/* Product Management is separate - no form wrapper */}
-            {activeTab === 'product-management' ? (
-              <ProductManagementCMS />
-            ) : (
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
                 {/* Hero Section */}
                 {activeTab === 'hero' && (
                 <div className="bg-white rounded-lg shadow-soft p-6">
@@ -1320,8 +1314,8 @@ const SuperAdminCMS: React.FC = () => {
                 </div>
               )}
 
-              {/* Other tabs content - Note: product-management is handled above */}
-              {!['hero', 'advertisements', 'products', 'product-management', 'company', 'theme', 'social', 'features'].includes(activeTab) && (
+              {/* Other tabs content */}
+              {!['hero', 'advertisements', 'products', 'company', 'theme', 'social', 'features'].includes(activeTab) && (
                 <div className="bg-white rounded-lg shadow-soft p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-6">
                     {tabs.find(tab => tab.id === activeTab)?.label}
@@ -1331,8 +1325,7 @@ const SuperAdminCMS: React.FC = () => {
                   </p>
                 </div>
               )}
-              </form>
-            )}
+            </form>
           </div>
         </div>
       </div>

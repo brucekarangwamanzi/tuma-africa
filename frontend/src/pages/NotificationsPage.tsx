@@ -19,7 +19,7 @@ import {
   DollarSign,
   Truck
 } from 'lucide-react';
-import { useNotificationStore, Notification } from '../store/notificationStore';
+import { useNotificationStore, Notification, getNotificationId } from '../store/notificationStore';
 import { useAuthStore } from '../store/authStore';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -84,7 +84,7 @@ const NotificationsPage: React.FC = () => {
   // Handle notification click
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.read) {
-      await markAsRead(notification._id);
+      await markAsRead(getNotificationId(notification));
     }
 
     // Navigate based on notification type and link
@@ -127,7 +127,7 @@ const NotificationsPage: React.FC = () => {
 
   // Select all
   const selectAll = () => {
-    const allIds = notifications.map(n => n._id);
+    const allIds = notifications.map(n => getNotificationId(n)).filter(id => id !== '');
     setSelectedNotifications(new Set(allIds));
   };
 
@@ -202,7 +202,28 @@ const NotificationsPage: React.FC = () => {
     const groups: { [key: string]: Notification[] } = {};
     
     notifications.forEach(notification => {
+      // Validate date before using it
+      if (!notification.createdAt) {
+        // If no date, put in "Unknown" group
+        if (!groups['Unknown']) {
+          groups['Unknown'] = [];
+        }
+        groups['Unknown'].push(notification);
+        return;
+      }
+
       const date = new Date(notification.createdAt);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        // Invalid date, put in "Unknown" group
+        if (!groups['Unknown']) {
+          groups['Unknown'] = [];
+        }
+        groups['Unknown'].push(notification);
+        return;
+      }
+
       const today = new Date();
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
@@ -392,7 +413,7 @@ const NotificationsPage: React.FC = () => {
                 <div className="space-y-2 sm:space-y-3">
                   {dateNotifications.map((notification) => (
                     <div
-                      key={notification._id}
+                      key={getNotificationId(notification)}
                       className={`bg-white rounded-lg shadow-sm border-l-4 ${
                         !notification.read ? getPriorityColor(notification.priority) : 'border-l-gray-300 bg-white'
                       } border-r border-t border-b border-gray-200 hover:shadow-md active:shadow-lg transition-all cursor-pointer touch-manipulation`}
@@ -403,10 +424,10 @@ const NotificationsPage: React.FC = () => {
                           {/* Checkbox for selection */}
                           <input
                             type="checkbox"
-                            checked={selectedNotifications.has(notification._id)}
+                            checked={selectedNotifications.has(getNotificationId(notification))}
                             onChange={(e) => {
                               e.stopPropagation();
-                              toggleSelection(notification._id);
+                              toggleSelection(getNotificationId(notification));
                             }}
                             onClick={(e) => e.stopPropagation()}
                             className="mt-1 sm:mt-1.5 h-4 w-4 sm:h-5 sm:w-5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded flex-shrink-0 touch-manipulation"
@@ -437,7 +458,11 @@ const NotificationsPage: React.FC = () => {
                                 <div className="flex items-center flex-wrap gap-2 sm:gap-3 mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500">
                                   <div className="flex items-center space-x-1">
                                     <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
-                                    <span className="whitespace-nowrap">{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
+                                    <span className="whitespace-nowrap">
+                                      {notification.createdAt && !isNaN(new Date(notification.createdAt).getTime())
+                                        ? formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })
+                                        : 'Just now'}
+                                    </span>
                                   </div>
                                   {notification.priority === 'urgent' && (
                                     <span className="px-2 py-0.5 sm:py-1 bg-red-100 text-red-700 rounded-full font-medium text-xs sm:text-sm whitespace-nowrap">
@@ -456,7 +481,7 @@ const NotificationsPage: React.FC = () => {
                                   <button
                                     onClick={async (e) => {
                                       e.stopPropagation();
-                                      await markAsRead(notification._id);
+                                      await markAsRead(getNotificationId(notification));
                                     }}
                                     className="p-2 sm:p-2.5 text-gray-400 hover:text-primary-600 active:bg-primary-50 transition-colors rounded-lg touch-manipulation"
                                     title="Mark as read"
@@ -468,7 +493,7 @@ const NotificationsPage: React.FC = () => {
                                 <button
                                   onClick={async (e) => {
                                     e.stopPropagation();
-                                    await deleteNotification(notification._id);
+                                    await deleteNotification(getNotificationId(notification));
                                   }}
                                   className="p-2 sm:p-2.5 text-gray-400 hover:text-red-600 active:bg-red-50 transition-colors rounded-lg touch-manipulation"
                                   title="Delete"

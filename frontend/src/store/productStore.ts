@@ -3,8 +3,14 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuthStore } from './authStore';
 
+// Helper function to get product ID (supports both id and _id)
+export const getProductId = (product: Product): string => {
+  return product.id || product._id || '';
+};
+
 interface Product {
-  _id: string;
+  id?: string; // UUID from PostgreSQL
+  _id?: string; // Legacy MongoDB ID (for backward compatibility)
   name: string;
   description: string;
   price: number;
@@ -410,12 +416,12 @@ export const useProductStore = create<ProductState>((set, get) => ({
       // Update product in list
       const { products, currentProduct } = get();
       const updatedProducts = products.map(product =>
-        product._id === productId ? updatedProduct : product
+        getProductId(product) === productId ? updatedProduct : product
       );
       
       set({
         products: updatedProducts,
-        currentProduct: currentProduct?._id === productId ? updatedProduct : currentProduct,
+        currentProduct: currentProduct && getProductId(currentProduct) === productId ? updatedProduct : currentProduct,
         isLoading: false
       });
       
@@ -443,12 +449,12 @@ export const useProductStore = create<ProductState>((set, get) => ({
       // Update product in list
       const { products, currentProduct } = get();
       const updatedProducts = products.map(product =>
-        product._id === productId ? updatedProduct : product
+        getProductId(product) === productId ? updatedProduct : product
       );
       
       set({
         products: updatedProducts,
-        currentProduct: currentProduct?._id === productId 
+        currentProduct: currentProduct && getProductId(currentProduct) === productId 
           ? updatedProduct 
           : currentProduct,
         isSubmitting: false
@@ -475,7 +481,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
       // Remove from products list (soft delete - mark as inactive)
       const { products } = get();
       const updatedProducts = products.map(product =>
-        product._id === productId ? { ...product, isActive: false } : product
+        getProductId(product) === productId ? { ...product, isActive: false } : product
       );
       
       set({
@@ -506,7 +512,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
       // Update product in list
       const { products, currentProduct } = get();
       const updatedProducts = products.map(product =>
-        product._id === productId ? { ...product, featured } : product
+        getProductId(product) === productId ? { ...product, featured } : product
       );
       
       set({

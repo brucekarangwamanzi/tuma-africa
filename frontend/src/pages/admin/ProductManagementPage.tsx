@@ -15,7 +15,7 @@ import {
   Users,
   Activity
 } from 'lucide-react';
-import { useProductStore } from '../../store/productStore';
+import { useProductStore, getProductId } from '../../store/productStore';
 import { useAuthStore } from '../../store/authStore';
 import { formatDistanceToNow } from 'date-fns';
 import { EyeOff, Eye as EyeOn } from 'lucide-react';
@@ -352,8 +352,10 @@ const ProductManagementPage: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {products.map((product) => (
-                <div key={product._id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 overflow-hidden">
+              {products.map((product) => {
+                const productId = getProductId(product);
+                return (
+                <div key={productId} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 overflow-hidden">
                   <div className="relative">
                     <img
                       src={product.imageUrl}
@@ -410,7 +412,7 @@ const ProductManagementPage: React.FC = () => {
                     
                     <div className="flex items-center space-x-2">
                       <Link
-                        to={`/admin/products/${product._id}`}
+                        to={`/admin/products/${productId}`}
                         className="flex-1 flex items-center justify-center px-3 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors text-sm font-medium"
                       >
                         <Eye className="w-4 h-4 mr-1" />
@@ -418,7 +420,7 @@ const ProductManagementPage: React.FC = () => {
                       </Link>
                       {canEditProducts && (
                         <Link
-                          to={`/admin/products/${product._id}/edit`}
+                          to={`/admin/products/${productId}/edit`}
                           className="flex-1 flex items-center justify-center px-3 py-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors text-sm font-medium"
                         >
                           <Edit className="w-4 h-4 mr-1" />
@@ -427,7 +429,10 @@ const ProductManagementPage: React.FC = () => {
                       )}
                       {canChangeStatus && (
                         <button
-                          onClick={() => handleToggleStatus(product._id, product.isActive)}
+                          onClick={() => {
+                            const productId = getProductId(product);
+                            if (productId) handleToggleStatus(productId, product.isActive);
+                          }}
                           className={`p-2 rounded-lg transition-colors ${
                             product.isActive
                               ? 'text-gray-600 bg-gray-50 hover:bg-gray-100'
@@ -440,7 +445,10 @@ const ProductManagementPage: React.FC = () => {
                       )}
                       {canEditProducts && (
                         <button
-                          onClick={() => handleToggleFeatured(product._id)}
+                          onClick={() => {
+                            const productId = getProductId(product);
+                            if (productId) handleToggleFeatured(productId);
+                          }}
                           className={`p-2 rounded-lg transition-colors ${
                             product.featured
                               ? 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100'
@@ -453,7 +461,10 @@ const ProductManagementPage: React.FC = () => {
                       )}
                       {user?.role === 'super_admin' && (
                         <button
-                          onClick={() => handleDelete(product._id, product.name)}
+                          onClick={() => {
+                            const productId = getProductId(product);
+                            if (productId) handleDelete(productId, product.name);
+                          }}
                           className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                           title="Delete product"
                         >
@@ -463,7 +474,8 @@ const ProductManagementPage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

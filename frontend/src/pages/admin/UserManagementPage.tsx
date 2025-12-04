@@ -21,7 +21,7 @@ import {
   RefreshCw,
   TrendingUp
 } from 'lucide-react';
-import { useUserStore } from '../../store/userStore';
+import { useUserStore, getUserId } from '../../store/userStore';
 import { formatDistanceToNow } from 'date-fns';
 
 const UserManagementPage: React.FC = () => {
@@ -369,8 +369,10 @@ const UserManagementPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            users.map((user) => (
-              <div key={user._id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
+            users.map((user) => {
+              const userId = getUserId(user);
+              return (
+              <div key={userId} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
                 <div className="p-6">
                   <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
                     <div className="flex-1">
@@ -455,14 +457,14 @@ const UserManagementPage: React.FC = () => {
                       {!user.approved && user.isActive && (
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleApproval(user._id, true, user.fullName)}
+                            onClick={() => handleApproval(userId, true, user.fullName)}
                             className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
                           >
                             <Check className="w-4 h-4 mr-1" />
                             Approve
                           </button>
                           <button
-                            onClick={() => handleApproval(user._id, false, user.fullName)}
+                            onClick={() => handleApproval(userId, false, user.fullName)}
                             className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
                           >
                             <X className="w-4 h-4 mr-1" />
@@ -475,7 +477,7 @@ const UserManagementPage: React.FC = () => {
                         <div className="flex space-x-2">
                           <select
                             value={user.role}
-                            onChange={(e) => handleRoleChange(user._id, e.target.value, user.fullName)}
+                            onChange={(e) => handleRoleChange(userId, e.target.value, user.fullName)}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                           >
                             <option value="user">User</option>
@@ -487,7 +489,7 @@ const UserManagementPage: React.FC = () => {
                       
                       <div className="flex space-x-2">
                         <Link
-                          to={`/admin/users/${user._id}`}
+                          to={`/admin/users/${userId}`}
                           className="flex-1 flex items-center justify-center px-4 py-2 text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
                         >
                           <Eye className="w-4 h-4 mr-1" />
@@ -496,7 +498,7 @@ const UserManagementPage: React.FC = () => {
                         
                         {user.isActive && (
                           <button
-                            onClick={() => handleDeactivate(user._id, user.fullName)}
+                            onClick={() => handleDeactivate(userId, user.fullName)}
                             className="px-4 py-2 text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
                           >
                             <UserX className="w-4 h-4" />
@@ -507,7 +509,8 @@ const UserManagementPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 

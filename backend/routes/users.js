@@ -1,5 +1,6 @@
 const express = require('express');
-const User = require('../models/User');
+const { Op } = require('sequelize');
+const { User, Order, Chat, Message } = require('../models');
 const { authenticateToken, requireApproval } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 
@@ -29,8 +30,9 @@ const router = express.Router();
 // @access  Private
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id)
-      .select('-passwordHash -refreshToken');
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ['passwordHash', 'refreshToken'] }
+    });
 
     res.json({ user });
 
@@ -121,17 +123,30 @@ router.put('/profile',
       const updateData = {};
       if (fullName) updateData.fullName = fullName;
       if (phone) updateData.phone = phone;
-      if (address) updateData.address = { ...req.user.address, ...address };
+      if (address) {
+        // Update individual address fields
+        if (address.street !== undefined) updateData.addressStreet = address.street;
+        if (address.city !== undefined) updateData.addressCity = address.city;
+        if (address.state !== undefined) updateData.addressState = address.state;
+        if (address.country !== undefined) updateData.addressCountry = address.country;
+        if (address.zipCode !== undefined) updateData.addressZipCode = address.zipCode;
+      }
       if (profileImage) updateData.profileImage = profileImage;
       if (currency && ['RWF', 'Yuan', 'USD'].includes(currency)) {
         updateData.currency = currency;
       }
 
-      const user = await User.findByIdAndUpdate(
-        req.user._id,
-        updateData,
-        { new: true, runValidators: true }
-      ).select('-passwordHash -refreshToken');
+      const user = await User.findByPk(req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      await user.update(updateData);
+      
+      // Reload to get updated data
+      await user.reload({
+        attributes: { exclude: ['passwordHash', 'refreshToken'] }
+      });
 
       res.json({
         message: 'Profile updated successfully',
@@ -193,7 +208,7 @@ router.put('/change-password',
       const { currentPassword, newPassword } = req.body;
 
       // Get user with password
-      const user = await User.findById(req.user._id).select('+passwordHash');
+      const user = await User.scope('withPassword').findByPk(req.user.id);
       
       // Verify current password
       const isCurrentPasswordValid = await user.comparePassword(currentPassword);
@@ -203,9 +218,10 @@ router.put('/change-password',
       }
 
       // Update password
-      user.passwordHash = newPassword; // Will be hashed by pre-save middleware
-      user.refreshToken = undefined; // Invalidate all sessions
-      await user.save();
+      await user.update({
+        passwordHash: newPassword, // Will be hashed by beforeUpdate hook
+        refreshToken: null // Invalidate all sessions
+      });
 
       res.json({ message: 'Password changed successfully' });
 
@@ -228,7 +244,11 @@ router.delete('/account', authenticateToken, async (req, res) => {
     }
 
     // Get user with password
-    const user = await User.findById(req.user._id).select('+passwordHash');
+    const user = await User.scope('withPassword').findByPk(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
     
     // Verify password
     const isPasswordValid = await user.comparePassword(password);
@@ -238,9 +258,10 @@ router.delete('/account', authenticateToken, async (req, res) => {
     }
 
     // Deactivate account
-    user.isActive = false;
-    user.refreshToken = undefined;
-    await user.save();
+    await user.update({
+      isActive: false,
+      refreshToken: null
+    });
 
     res.json({ message: 'Account deactivated successfully' });
 
@@ -255,50 +276,81 @@ router.delete('/account', authenticateToken, async (req, res) => {
 // @access  Private
 router.get('/dashboard-stats', authenticateToken, requireApproval, async (req, res) => {
   try {
-    const Order = require('../models/Order');
-    const Chat = require('../models/Chat');
+    const { sequelize } = require('../models');
 
     // Get user's order statistics
-    const orderStats = await Order.aggregate([
-      { $match: { userId: req.user._id } },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          totalValue: { $sum: '$finalAmount' }
-        }
-      }
-    ]);
+    const orderStats = await Order.findAll({
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+        [sequelize.fn('SUM', sequelize.cast(sequelize.col('final_amount'), 'DECIMAL')), 'totalValue']
+      ],
+      where: { userId: req.user.id },
+      group: ['status'],
+      raw: true
+    });
+
+    // Format orderStats to match expected format
+    const formattedOrderStats = orderStats.map(stat => ({
+      _id: stat.status,
+      count: parseInt(stat.count) || 0,
+      totalValue: parseFloat(stat.totalValue) || 0
+    }));
 
     // Get recent orders
-    const recentOrders = await Order.find({ userId: req.user._id })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select('orderId productName status finalAmount createdAt');
+    const recentOrders = await Order.findAll({
+      where: { userId: req.user.id },
+      attributes: ['id', 'orderId', 'productName', 'status', 'finalAmount', 'createdAt'],
+      order: [['createdAt', 'DESC']],
+      limit: 5
+    });
 
     // Get unread messages count
-    const unreadMessages = await Chat.aggregate([
-      { $match: { participants: req.user._id } },
-      { $unwind: '$messages' },
-      { 
-        $match: { 
-          'messages.isRead': false,
-          'messages.createdAt': { $gt: req.user.lastLogin || new Date(0) }
+    // Find chats where user is a participant
+    const userChats = await Chat.findAll({
+      include: [
+        {
+          model: User,
+          as: 'participants',
+          where: { id: req.user.id },
+          through: { attributes: [] },
+          required: true
         }
-      },
-      { $count: 'unreadCount' }
-    ]);
+      ],
+      attributes: ['id']
+    });
+
+    const chatIds = userChats.map(chat => chat.id);
+    
+    const unreadMessagesCount = await Message.count({
+      where: {
+        chatId: { [Op.in]: chatIds },
+        isRead: false,
+        sender: { [Op.ne]: req.user.id }, // Don't count own messages
+        createdAt: { [Op.gt]: req.user.lastLogin || new Date(0) }
+      }
+    });
 
     // Get active chats count
-    const activeChats = await Chat.countDocuments({
-      participants: req.user._id,
-      status: { $in: ['open', 'in_progress'] }
+    const activeChats = await Chat.count({
+      include: [
+        {
+          model: User,
+          as: 'participants',
+          where: { id: req.user.id },
+          through: { attributes: [] },
+          required: true
+        }
+      ],
+      where: {
+        status: { [Op.in]: ['open', 'in_progress'] }
+      }
     });
 
     res.json({
-      orderStats,
+      orderStats: formattedOrderStats,
       recentOrders,
-      unreadMessages: unreadMessages[0]?.unreadCount || 0,
+      unreadMessages: unreadMessagesCount,
       activeChats,
       user: {
         fullName: req.user.fullName,
@@ -320,7 +372,7 @@ router.get('/dashboard-stats', authenticateToken, requireApproval, async (req, r
 // @access  Private
 router.post('/verify-email', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findByPk(req.user.id);
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -336,9 +388,10 @@ router.post('/verify-email', authenticateToken, async (req, res) => {
     const verificationExpires = new Date();
     verificationExpires.setHours(verificationExpires.getHours() + 24);
 
-    user.emailVerificationToken = verificationToken;
-    user.emailVerificationExpires = verificationExpires;
-    await user.save();
+    await user.update({
+      emailVerificationToken: verificationToken,
+      emailVerificationExpires: verificationExpires
+    });
 
     // Send verification email
     const { sendVerificationEmail } = require('../utils/emailService');
@@ -378,8 +431,10 @@ router.get('/verify-email/:token', async (req, res) => {
     const { token } = req.params;
 
     const user = await User.findOne({
-      emailVerificationToken: token,
-      emailVerificationExpires: { $gt: new Date() }
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpires: { [Op.gt]: new Date() }
+      }
     });
 
     if (!user) {
@@ -389,11 +444,12 @@ router.get('/verify-email/:token', async (req, res) => {
     }
 
     // Verify the email
-    user.verified = true;
-    user.emailVerifiedAt = new Date();
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpires = undefined;
-    await user.save();
+    await user.update({
+      verified: true,
+      emailVerifiedAt: new Date(),
+      emailVerificationToken: null,
+      emailVerificationExpires: null
+    });
 
     res.json({ 
       message: 'Email verified successfully!',
@@ -411,19 +467,21 @@ router.get('/verify-email/:token', async (req, res) => {
 // @access  Private
 router.get('/notifications', authenticateToken, requireApproval, async (req, res) => {
   try {
-    const Order = require('../models/Order');
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     
     // Get recent order updates
-    const orderUpdates = await Order.find({ 
-      userId: req.user._id,
-      updatedAt: { $gt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Last 7 days
-    })
-    .sort({ updatedAt: -1 })
-    .limit(10)
-    .select('orderId productName status updatedAt stageHistory');
+    const orderUpdates = await Order.findAll({ 
+      where: {
+        userId: req.user.id,
+        updatedAt: { [Op.gt]: sevenDaysAgo } // Last 7 days
+      },
+      attributes: ['id', 'orderId', 'productName', 'status', 'updatedAt', 'stageHistory'],
+      order: [['updatedAt', 'DESC']],
+      limit: 10
+    });
 
     const notifications = orderUpdates.map(order => ({
-      id: order._id,
+      id: order.id,
       type: 'order_update',
       title: `Order ${order.orderId} Updated`,
       message: `Your order "${order.productName}" status changed to ${order.status}`,

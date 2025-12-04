@@ -32,6 +32,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage';
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import SuperAdminCMS from './pages/admin/SuperAdminCMS';
+import CMS from './pages/admin/CMS';
 import ProductManagementPage from './pages/admin/ProductManagementPage';
 import CreateProductPage from './pages/admin/CreateProductPage';
 import EditProductPage from './pages/admin/EditProductPage';
@@ -205,6 +206,12 @@ function App() {
           <Route path="/admin/chats" element={
             <AdminRoute>
               <ChatManagementPage />
+            </AdminRoute>
+          } />
+          
+          <Route path="/admin/cms" element={
+            <AdminRoute>
+              <CMS />
             </AdminRoute>
           } />
           

@@ -3,7 +3,8 @@ import { Eye, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Order {
-  _id: string;
+  id?: string; // PostgreSQL UUID
+  _id?: string; // MongoDB ObjectId (for backward compatibility)
   orderId: string;
   userId: {
     fullName: string;
@@ -13,6 +14,11 @@ interface Order {
   finalAmount: number;
   createdAt: string;
 }
+
+// Helper function to get order ID (supports both id and _id)
+const getOrderId = (order: Order): string => {
+  return order.id || order._id || '';
+};
 
 interface RecentOrdersProps {
   orders: Order[];
@@ -73,7 +79,7 @@ const RecentOrders: React.FC<RecentOrdersProps> = ({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {orders.map((order) => (
-                <tr key={order._id} className="hover:bg-gray-50">
+                <tr key={getOrderId(order)} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
                       {order.orderId}
@@ -100,14 +106,14 @@ const RecentOrders: React.FC<RecentOrdersProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => onViewOrder(order._id)}
+                        onClick={() => onViewOrder(getOrderId(order))}
                         className="text-blue-600 hover:text-blue-900"
                         title="View Order"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => onEditOrder(order._id)}
+                        onClick={() => onEditOrder(getOrderId(order))}
                         className="text-green-600 hover:text-green-900"
                         title="Edit Order"
                       >

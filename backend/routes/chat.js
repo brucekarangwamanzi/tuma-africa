@@ -1,6 +1,6 @@
 const express = require('express');
-const Chat = require('../models/Chat');
-const User = require('../models/User');
+const { Op } = require('sequelize');
+const { Chat, User, Message, ChatParticipants, Order } = require('../models');
 const { authenticateToken, requireRole, requireApproval } = require('../middleware/auth');
 const { validateChatMessage, validatePagination } = require('../middleware/validation');
 const { createMessageNotification } = require('../utils/notifications');
@@ -173,25 +173,44 @@ router.post('/messages', authenticateToken, upload.single('file'), async (req, r
 // @access  Private
 router.get('/messages', authenticateToken, async (req, res) => {
   try {
-    const User = require('../models/User');
     const isAdmin = req.user.role === 'admin' || req.user.role === 'super_admin';
     
     if (isAdmin) {
       // Admin view: Get all support chats
-      const chats = await Chat.find({
-        chatType: 'support'
-      }).populate('participants', 'fullName email role');
+      const chats = await Chat.findAll({
+        where: { chatType: 'support' },
+        include: [
+          {
+            model: User,
+            as: 'participants',
+            attributes: ['id', 'fullName', 'email', 'role'],
+            through: { attributes: [] }
+          }
+        ]
+      });
 
       // Collect all messages from all chats with proper sender info
       const allMessages = [];
       
       for (const chat of chats) {
-        for (const msg of chat.messages) {
-          const sender = chat.participants.find(p => p._id.toString() === msg.sender?.toString());
+        const messages = await Message.findAll({
+          where: { chatId: chat.id },
+          include: [
+            {
+              model: User,
+              as: 'senderUser',
+              attributes: ['id', 'fullName', 'email', 'role']
+            }
+          ],
+          order: [['createdAt', 'ASC']]
+        });
+        
+        for (const msg of messages) {
+          const sender = msg.senderUser;
           
           allMessages.push({
-            id: msg._id.toString(),
-            senderId: msg.sender?.toString() || 'unknown',
+            id: msg.id,
+            senderId: msg.sender || 'unknown',
             senderName: sender?.fullName || 'Unknown',
             senderRole: sender?.role || 'user',
             content: msg.text || '',
@@ -201,7 +220,7 @@ router.get('/messages', authenticateToken, async (req, res) => {
             fileSize: msg.fileSize,
             timestamp: msg.createdAt,
             status: msg.isRead ? 'read' : 'delivered',
-            chatId: chat._id.toString()
+            chatId: chat.id
           });
         }
       }
@@ -209,88 +228,150 @@ router.get('/messages', authenticateToken, async (req, res) => {
       // Sort by timestamp
       allMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
+      // For admin view, return the first chat ID or create a default chat if none exists
+      let chatId = chats[0]?.id || null;
+      
+      // If no chats exist and we have messages, we need to handle this case
+      // But typically admins should see all chats, so this shouldn't happen
+      if (!chatId && allMessages.length > 0) {
+        // Get chat ID from first message
+        chatId = allMessages[0].chatId || null;
+      }
+
       res.json({
         messages: allMessages,
-        chatId: chats[0]?._id || null
+        chatId: chatId
       });
 
     } else {
-      // User view: Get their support chat - Enhanced to ensure we find the correct chat
-      // Try multiple queries to find the user's chat
-      let chat = await Chat.findOne({
-        participants: req.user._id,
-        chatType: 'support'
-      }).populate('participants', 'fullName email role');
+      // User view: Get their support chat
+      // Find chat where user is a participant using the many-to-many relationship
+      const chats = await Chat.findAll({
+        where: { chatType: 'support' },
+        include: [
+          {
+            model: User,
+            as: 'participants',
+            where: { id: req.user.id },
+            attributes: ['id', 'fullName', 'email', 'role'],
+            through: { attributes: [] },
+            required: true
+          }
+        ]
+      });
 
-      // If not found, try finding by user ID in participants array (more reliable)
-      if (!chat) {
-        chat = await Chat.findOne({
-          'participants': { $in: [req.user._id] },
-          chatType: 'support'
-        }).populate('participants', 'fullName email role');
-      }
-
-      // If still not found, try to find any chat where user is a participant
-      if (!chat) {
-        const allChats = await Chat.find({
-          chatType: 'support'
-        }).populate('participants', 'fullName email role');
-        
-        chat = allChats.find(c => 
-          c.participants.some(p => p._id.toString() === req.user._id.toString())
-        );
-      }
+      let chat = chats[0];
 
       if (!chat) {
-        // Only create new chat if absolutely no chat exists for this user
+        // Create new support chat if none exists
         const admin = await User.findOne({ 
-          role: { $in: ['admin', 'super_admin'] }, 
-          isActive: true 
-        }).sort({ createdAt: 1 }); // Get first admin
+          where: { 
+            role: { [Op.in]: ['admin', 'super_admin'] }, 
+            isActive: true 
+          },
+          order: [['createdAt', 'ASC']]
+        });
         
-        const participants = [req.user._id];
-        if (admin) participants.push(admin._id);
-
-        chat = new Chat({
-          participants,
+        chat = await Chat.create({
           chatType: 'support',
           title: `Support Chat - ${req.user.fullName}`,
           status: 'open',
-          priority: 'medium',
-          messages: []
+          priority: 'medium'
         });
 
-        await chat.save();
-        await chat.populate('participants', 'fullName email role');
-        console.log(`✅ Created new support chat ${chat._id} for user ${req.user._id}`);
+        // Add user as participant (Sequelize uses plural method name for belongsToMany)
+        // The method name is based on the alias 'participants', so it's addParticipants
+        // It accepts an array of IDs or a single ID
+        try {
+          await chat.addParticipants(req.user.id);
+          console.log(`✅ Added user ${req.user.id} as participant to chat ${chat.id}`);
+        } catch (participantError) {
+          console.error('Error adding user as participant:', participantError);
+          // Try alternative method if addParticipants fails
+          try {
+            const { ChatParticipants } = require('../models');
+            await ChatParticipants.create({
+              chatId: chat.id,
+              userId: req.user.id
+            });
+            console.log(`✅ Added user ${req.user.id} as participant via direct create`);
+          } catch (createError) {
+            console.error('Error creating participant directly:', createError);
+            // Continue anyway - chat is created
+          }
+        }
+        
+        // Add admin as participant if found
+        if (admin) {
+          try {
+            await chat.addParticipants(admin.id);
+            console.log(`✅ Added admin ${admin.id} as participant to chat ${chat.id}`);
+          } catch (participantError) {
+            console.error('Error adding admin as participant:', participantError);
+            // Try alternative method
+            try {
+              const { ChatParticipants } = require('../models');
+              await ChatParticipants.create({
+                chatId: chat.id,
+                userId: admin.id
+              });
+              console.log(`✅ Added admin ${admin.id} as participant via direct create`);
+            } catch (createError) {
+              console.error('Error creating admin participant directly:', createError);
+            }
+          }
+        }
+
+        // Reload with participants to ensure we have the full chat object
+        await chat.reload({
+          include: [
+            {
+              model: User,
+              as: 'participants',
+              attributes: ['id', 'fullName', 'email', 'role'],
+              through: { attributes: [] }
+            }
+          ]
+        });
+        
+        console.log(`✅ Created new support chat ${chat.id} for user ${req.user.id} with ${chat.participants?.length || 0} participants`);
       } else {
-        console.log(`✅ Found existing chat ${chat._id} with ${chat.messages.length} messages for user ${req.user._id}`);
+        // Reload with participants
+        await chat.reload({
+          include: [
+            {
+              model: User,
+              as: 'participants',
+              attributes: ['id', 'fullName', 'email', 'role'],
+              through: { attributes: [] }
+            }
+          ]
+        });
+        console.log(`✅ Found existing chat ${chat.id} for user ${req.user.id}`);
       }
 
-      // Ensure user is in participants (safety check)
-      const userIdStr = req.user._id.toString();
-      const isParticipant = chat.participants.some(p => p._id.toString() === userIdStr);
-      if (!isParticipant) {
-        chat.participants.push(req.user._id);
-        await chat.save();
-        await chat.populate('participants', 'fullName email role');
-        console.log(`➕ Added user ${req.user._id} to chat ${chat._id} participants`);
-      }
+      // Get messages for this chat
+      const messages = await Message.findAll({
+        where: { chatId: chat.id },
+        include: [
+          {
+            model: User,
+            as: 'senderUser',
+            attributes: ['id', 'fullName', 'email', 'role']
+          }
+        ],
+        order: [['createdAt', 'ASC']]
+      });
 
-      // Format messages for frontend with proper sender info - Include fileSize
-      // Sort messages by timestamp to ensure correct order
-      const sortedMessages = [...chat.messages].sort((a, b) => 
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
-
-      const messages = sortedMessages.map(msg => {
-        const sender = chat.participants.find(p => p._id.toString() === msg.sender?.toString());
+      // Format messages for frontend
+      const formattedMessages = messages.map(msg => {
+        const sender = msg.senderUser;
         
         return {
-          id: msg._id.toString(),
-          senderId: msg.sender?.toString() || req.user._id.toString(),
-          senderName: sender?.fullName || (msg.sender?.toString() === req.user._id.toString() ? req.user.fullName : 'Support'),
-          senderRole: sender?.role || (msg.sender?.toString() === req.user._id.toString() ? req.user.role : 'admin'),
+          id: msg.id,
+          senderId: msg.sender || req.user.id,
+          senderName: sender?.fullName || (msg.sender === req.user.id ? req.user.fullName : 'Support'),
+          senderRole: sender?.role || (msg.sender === req.user.id ? req.user.role : 'admin'),
           content: msg.text || '',
           type: msg.type || 'text',
           fileUrl: msg.fileUrl,
@@ -301,12 +382,22 @@ router.get('/messages', authenticateToken, async (req, res) => {
         };
       });
 
-      console.log(`📨 Returning ${messages.length} messages for user ${req.user._id} from chat ${chat._id}`);
+      // Ensure chatId is always returned
+      if (!chat || !chat.id) {
+        console.error('⚠️ Chat created but ID is missing!', { chat: chat ? { ...chat.toJSON(), id: chat.id } : null });
+        return res.status(500).json({ message: 'Failed to create or retrieve chat' });
+      }
 
-      res.json({
-        messages,
-        chatId: chat._id.toString()
-      });
+      console.log(`📨 Returning ${formattedMessages.length} messages for user ${req.user.id} from chat ${chat.id}`);
+
+      const response = {
+        messages: formattedMessages,
+        chatId: chat.id
+      };
+      
+      console.log(`📤 Response chatId: ${response.chatId}, messages count: ${response.messages.length}`);
+      
+      res.json(response);
     }
 
   } catch (error) {
@@ -691,37 +782,67 @@ router.get('/admin/all', authenticateToken, requireRole(['admin', 'super_admin']
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
     
     const { status, priority, assigned } = req.query;
     
-    let query = {};
+    const where = {};
     
-    if (status) query.status = status;
-    if (priority) query.priority = priority;
-    if (assigned === 'true') query.assignedTo = req.user._id;
-    if (assigned === 'false') query.assignedTo = { $exists: false };
+    if (status) where.status = status;
+    if (priority) where.priority = priority;
+    if (assigned === 'true') where.assignedToId = req.user.id;
+    if (assigned === 'false') where.assignedToId = null;
 
-    const chats = await Chat.find(query)
-      .populate('participants', 'fullName email role profileImage')
-      .populate('orderId', 'orderId productName status')
-      .populate('assignedTo', 'fullName email')
-      .populate('lastMessage.sender', 'fullName')
-      .sort({ 'lastMessage.createdAt': -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Chat.countDocuments(query);
-
-    // Get chat statistics
-    const stats = await Chat.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
+    const { count: total, rows: chats } = await Chat.findAndCountAll({
+      where,
+      include: [
+        { 
+          model: User, 
+          as: 'participants', 
+          attributes: ['id', 'fullName', 'email', 'role', 'profileImage'],
+          through: { attributes: [] } // Exclude junction table attributes
+        },
+        { 
+          model: Order, 
+          as: 'order', 
+          attributes: ['id', 'orderId', 'productName', 'status'],
+          required: false
+        },
+        { 
+          model: User, 
+          as: 'assignedUser', 
+          attributes: ['id', 'fullName', 'email'],
+          required: false
+        },
+        {
+          model: Message,
+          as: 'messages',
+          attributes: ['id'],
+          required: false,
+          separate: true // Separate query for better performance
         }
-      }
-    ]);
+      ],
+      order: [['lastMessageCreatedAt', 'DESC NULLS LAST']],
+      offset,
+      limit,
+      distinct: true // Important for counting with many-to-many relationships
+    });
+
+    // Get chat statistics using Sequelize
+    const { sequelize } = require('../models');
+    const statsResult = await Chat.findAll({
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['status'],
+      raw: true
+    });
+
+    const stats = statsResult.map(stat => ({
+      _id: stat.status,
+      count: parseInt(stat.count) || 0
+    }));
 
     res.json({
       chats,
@@ -748,11 +869,13 @@ router.delete('/:chatId', authenticateToken, requireRole(['admin', 'super_admin'
   try {
     const { chatId } = req.params;
 
-    const chat = await Chat.findByIdAndDelete(chatId);
+    const chat = await Chat.findByPk(chatId);
 
     if (!chat) {
       return res.status(404).json({ message: 'Chat not found' });
     }
+
+    await chat.destroy();
 
     res.json({ message: 'Chat deleted successfully' });
 

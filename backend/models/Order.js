@@ -1,170 +1,159 @@
-const mongoose = require('mongoose');
-
-const orderSchema = new mongoose.Schema({
-  orderId: {
-    type: String,
-    required: true,
-    unique: true,
-    default: function() {
-      return 'TMA-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+module.exports = (sequelize, DataTypes) => {
+  const Order = sequelize.define('Order', {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
+    },
+    orderId: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+      field: 'order_id',
+      defaultValue: function() {
+        return 'TMA-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+      }
+    },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: 'user_id',
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    productName: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      field: 'product_name',
+      validate: {
+        notEmpty: { msg: 'Product name is required' }
+      }
+    },
+    productLink: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: '',
+      field: 'product_link'
+    },
+    productImage: {
+      type: DataTypes.STRING,
+      defaultValue: '',
+      field: 'product_image'
+    },
+    quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      validate: {
+        min: { args: [1], msg: 'Quantity must be at least 1' }
+      }
+    },
+    unitPrice: {
+      type: DataTypes.DECIMAL(20, 2),
+      defaultValue: 0,
+      field: 'unit_price'
+    },
+    totalPrice: {
+      type: DataTypes.DECIMAL(20, 2),
+      defaultValue: 0,
+      field: 'total_price'
+    },
+    shippingCost: {
+      type: DataTypes.DECIMAL(20, 2),
+      defaultValue: 0,
+      field: 'shipping_cost'
+    },
+    finalAmount: {
+      type: DataTypes.DECIMAL(20, 2),
+      defaultValue: 0,
+      field: 'final_amount'
+    },
+    currency: {
+      type: DataTypes.STRING,
+      defaultValue: 'USD'
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'processing', 'approved', 'purchased', 'warehouse', 'shipped', 'delivered', 'cancelled'),
+      defaultValue: 'pending'
+    },
+    priority: {
+      type: DataTypes.ENUM('low', 'normal', 'medium', 'high', 'urgent'),
+      defaultValue: 'normal'
+    },
+    freightType: {
+      type: DataTypes.ENUM('sea', 'air'),
+      defaultValue: 'sea',
+      field: 'freight_type'
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    specifications: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
+    },
+    shippingAddress: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
+    },
+    trackingInfo: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
+    },
+    stageHistory: {
+      type: DataTypes.ARRAY(DataTypes.JSONB),
+      defaultValue: []
+    },
+    assignedEmployeeId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'assigned_employee_id',
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    notes: {
+      type: DataTypes.ARRAY(DataTypes.JSONB),
+      defaultValue: []
+    },
+    attachments: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: []
+    },
+    paymentStatus: {
+      type: DataTypes.ENUM('pending', 'partial', 'paid', 'refunded'),
+      defaultValue: 'pending',
+      field: 'payment_status'
+    },
+    paymentMethod: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'payment_method'
+    },
+    isUrgent: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: 'is_urgent'
     }
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  productName: {
-    type: String,
-    required: [true, 'Product name is required'],
-    trim: true
-  },
-  productLink: {
-    type: String,
-    required: false,
-    default: '',
-    trim: true
-  },
-  productImage: {
-    type: String,
-    default: ''
-  },
-  quantity: {
-    type: Number,
-    required: [true, 'Quantity is required'],
-    min: [1, 'Quantity must be at least 1']
-  },
-  unitPrice: {
-    type: Number,
-    default: 0
-  },
-  totalPrice: {
-    type: Number,
-    default: 0
-  },
-  shippingCost: {
-    type: Number,
-    default: 0
-  },
-  finalAmount: {
-    type: Number,
-    default: 0
-  },
-  currency: {
-    type: String,
-    default: 'USD'
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'processing', 'approved', 'purchased', 'warehouse', 'shipped', 'delivered', 'cancelled'],
-    default: 'pending'
-  },
-  priority: {
-    type: String,
-    enum: ['low', 'normal', 'medium', 'high', 'urgent'],
-    default: 'normal'
-  },
-  freightType: {
-    type: String,
-    enum: ['sea', 'air'],
-    default: 'sea'
-  },
-  description: {
-    type: String,
-    trim: true
-  },
-  specifications: {
-    color: String,
-    size: String,
-    material: String,
-    brand: String,
-    model: String,
-    other: String
-  },
-  shippingAddress: {
-    fullName: String,
-    phone: String,
-    street: String,
-    city: String,
-    state: String,
-    country: String,
-    zipCode: String
-  },
-  trackingInfo: {
-    trackingNumber: String,
-    carrier: String,
-    estimatedDelivery: Date,
-    trackingUrl: String
-  },
-  stageHistory: [{
-    stage: {
-      type: String,
-      enum: ['pending', 'processing', 'approved', 'purchased', 'warehouse', 'shipped', 'delivered', 'cancelled']
-    },
-    timestamp: {
-      type: Date,
-      default: Date.now
-    },
-    updatedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    notes: String,
-    attachments: [String]
-  }],
-  assignedEmployee: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  notes: [{
-    text: String,
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now
+  }, {
+    tableName: 'orders',
+    timestamps: true,
+    underscored: false,
+    indexes: [
+      { fields: ['user_id', 'status'] },
+      { fields: ['order_id'] },
+      { fields: ['createdAt'] } // Use camelCase for createdAt
+    ],
+    hooks: {
+      beforeSave: (order) => {
+        // Calculate final amount
+        order.finalAmount = (parseFloat(order.totalPrice) || 0) + (parseFloat(order.shippingCost) || 0);
+      }
     }
-  }],
-  attachments: [String],
-  paymentStatus: {
-    type: String,
-    enum: ['pending', 'partial', 'paid', 'refunded'],
-    default: 'pending'
-  },
-  paymentMethod: String,
-  isUrgent: {
-    type: Boolean,
-    default: false
-  }
-}, {
-  timestamps: true
-});
+  });
 
-// Add stage to history when status changes
-orderSchema.pre('save', function(next) {
-  if (this.isModified('status') && !this.isNew) {
-    this.stageHistory.push({
-      stage: this.status,
-      timestamp: new Date(),
-      updatedBy: this.assignedEmployee
-    });
-  }
-  next();
-});
-
-// Calculate final amount
-orderSchema.pre('save', function(next) {
-  if (this.isModified('totalPrice') || this.isModified('shippingCost')) {
-    this.finalAmount = (this.totalPrice || 0) + (this.shippingCost || 0);
-  }
-  next();
-});
-
-// Indexes for better performance
-orderSchema.index({ userId: 1, status: 1 });
-orderSchema.index({ orderId: 1 });
-orderSchema.index({ createdAt: -1 });
-
-module.exports = mongoose.model('Order', orderSchema);
+  return Order;
+};

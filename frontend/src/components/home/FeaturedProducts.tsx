@@ -6,13 +6,19 @@ import { useSettingsStore } from '../../store/settingsStore';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface Product {
-  _id: string;
+  id?: string; // UUID from PostgreSQL
+  _id?: string; // Legacy MongoDB ID (for backward compatibility)
   name: string;
   description: string;
   price: number;
   imageUrl: string;
   category: string;
 }
+
+// Helper function to get product ID
+const getProductId = (product: Product): string => {
+  return product.id || product._id || '';
+};
 
 const FeaturedProducts: React.FC = () => {
   const { settings } = useSettingsStore();
@@ -95,7 +101,7 @@ const FeaturedProducts: React.FC = () => {
       <div className="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {products.map((product, index) => (
           <div
-            key={product._id}
+            key={getProductId(product)}
             className="card-anim bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1"
             style={{ animationDelay: `${index * 0.1}s` }}
           >
@@ -124,13 +130,13 @@ const FeaturedProducts: React.FC = () => {
               )}
               <div className="mt-auto pt-4 space-y-2">
                 <Link
-                  to={`/products/${product._id}`}
+                  to={`/products/${getProductId(product)}`}
                   className="block w-full text-center px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary hover:text-white transition-colors"
                 >
                   View Details
                 </Link>
                 <Link
-                  to={`/orders/new?product=${encodeURIComponent(product.name)}&price=${product.price}&quantity=1&fromWebsite=true&productId=${product._id}`}
+                  to={`/orders/new?product=${encodeURIComponent(product.name)}&price=${product.price}&quantity=1&fromWebsite=true&productId=${getProductId(product)}`}
                   className="btn-shine block w-full text-center btn-primary font-semibold px-4 py-2 rounded-lg transition-colors"
                 >
                   <ShoppingCart className="w-4 h-4 inline mr-2" />

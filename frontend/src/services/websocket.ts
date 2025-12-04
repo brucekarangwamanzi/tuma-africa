@@ -5,6 +5,8 @@ class WebSocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private userId: string | null = null;
+  private tokenRefreshInterval: NodeJS.Timeout | null = null;
+  private tokenCheckInterval: NodeJS.Timeout | null = null;
 
   connect(userId: string) {
     // Don't reconnect if already connected with same user
@@ -90,6 +92,12 @@ class WebSocketService {
       }
       this.reconnectAttempts = 0;
       this.socket?.emit('user:online', { userId });
+      
+      // Start token refresh monitoring
+      this.startTokenRefreshMonitoring();
+      
+      // Listen for token updates from auth store
+      this.setupTokenUpdateListener();
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -100,18 +108,39 @@ class WebSocketService {
       // Don't log normal disconnects to reduce noise
     });
 
-    this.socket.on('connect_error', (error: Error) => {
+    this.socket.on('connect_error', async (error: Error) => {
       // Only log authentication errors, not every connection attempt
       if (error.message.includes('Authentication') || error.message.includes('401') || error.message.includes('403')) {
         if (process.env.NODE_ENV === 'development') {
           console.error('❌ WebSocket auth error - token may be expired');
         }
-        // Don't disconnect immediately, let it retry with a new token
-        setTimeout(() => {
-          if (!this.socket?.connected) {
-            this.disconnect();
+        
+        // Try to refresh the token and reconnect
+        try {
+          const { useAuthStore } = await import('../store/authStore');
+          const refreshed = await useAuthStore.getState().refreshAccessToken();
+          
+          if (refreshed && this.userId) {
+            // Wait a bit then reconnect with new token
+            setTimeout(() => {
+              this.connect(this.userId!);
+            }, 1000);
+          } else {
+            // If refresh failed, disconnect
+            setTimeout(() => {
+              if (!this.socket?.connected) {
+                this.disconnect();
+              }
+            }, 5000);
           }
-        }, 5000);
+        } catch (refreshError) {
+          // If refresh fails, disconnect
+          setTimeout(() => {
+            if (!this.socket?.connected) {
+              this.disconnect();
+            }
+          }, 5000);
+        }
         return;
       }
       // Silently handle other connection errors (they will retry)
@@ -172,10 +201,205 @@ class WebSocketService {
   }
 
   disconnect() {
+    // Stop token refresh monitoring
+    this.stopTokenRefreshMonitoring();
+    
+    // Unsubscribe from token updates
+    if ((this as any)._tokenUnsubscribe) {
+      (this as any)._tokenUnsubscribe();
+      (this as any)._tokenUnsubscribe = null;
+    }
+    
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
     }
+  }
+
+  /**
+   * Decode JWT token to get expiration time
+   */
+  private decodeToken(token: string): { exp?: number; iat?: number } | null {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Check if token is expired or will expire soon
+   */
+  private isTokenExpiringSoon(token: string, thresholdMinutes: number = 30): boolean {
+    const decoded = this.decodeToken(token);
+    if (!decoded || !decoded.exp) {
+      return true; // If we can't decode, assume it's expired
+    }
+
+    const expirationTime = decoded.exp * 1000; // Convert to milliseconds
+    const now = Date.now();
+    const threshold = thresholdMinutes * 60 * 1000; // Convert minutes to milliseconds
+
+    // Check if token expires within the threshold
+    return expirationTime - now < threshold;
+  }
+
+  /**
+   * Update WebSocket connection with new token
+   */
+  private async updateSocketToken(newToken: string): Promise<void> {
+    if (!this.socket || !this.socket.connected) {
+      return;
+    }
+
+    try {
+      // Disconnect and reconnect with new token
+      const userId = this.userId;
+      if (userId) {
+        // Store the new token in localStorage first
+        try {
+          const authStorage = localStorage.getItem('auth-storage');
+          if (authStorage) {
+            const authData = JSON.parse(authStorage);
+            authData.state.accessToken = newToken;
+            localStorage.setItem('auth-storage', JSON.stringify(authData));
+          }
+        } catch (error) {
+          console.error('Failed to update token in storage:', error);
+        }
+
+        // Reconnect with new token
+        this.socket.disconnect();
+        setTimeout(() => {
+          this.connect(userId);
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Failed to update socket token:', error);
+    }
+  }
+
+  /**
+   * Start monitoring token expiration and refresh proactively
+   */
+  private startTokenRefreshMonitoring(): void {
+    // Clear any existing interval
+    this.stopTokenRefreshMonitoring();
+
+    // Check token every 5 minutes
+    this.tokenCheckInterval = setInterval(async () => {
+      try {
+        const authStorage = localStorage.getItem('auth-storage');
+        if (!authStorage) {
+          return;
+        }
+
+        const authData = JSON.parse(authStorage);
+        const currentToken = authData.state?.accessToken;
+
+        if (!currentToken) {
+          return;
+        }
+
+        // Check if token is expiring soon (within 30 minutes)
+        if (this.isTokenExpiringSoon(currentToken, 30)) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔄 Token expiring soon, refreshing...');
+          }
+
+          // Refresh the token
+          const { useAuthStore } = await import('../store/authStore');
+          const refreshed = await useAuthStore.getState().refreshAccessToken();
+
+          if (refreshed) {
+            // Get the new token
+            const newAuthData = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+            const newToken = newAuthData.state?.accessToken;
+
+            if (newToken && newToken !== currentToken) {
+              // Update WebSocket connection with new token
+              await this.updateSocketToken(newToken);
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log('✅ WebSocket token refreshed successfully');
+              }
+            }
+          }
+        }
+      } catch (error) {
+        // Silently handle errors - token refresh will be retried on next check
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Token refresh monitoring error:', error);
+        }
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+  }
+
+  /**
+   * Stop token refresh monitoring
+   */
+  private stopTokenRefreshMonitoring(): void {
+    if (this.tokenCheckInterval) {
+      clearInterval(this.tokenCheckInterval);
+      this.tokenCheckInterval = null;
+    }
+    if (this.tokenRefreshInterval) {
+      clearInterval(this.tokenRefreshInterval);
+      this.tokenRefreshInterval = null;
+    }
+  }
+
+  /**
+   * Setup listener for token updates from auth store
+   */
+  private setupTokenUpdateListener(): void {
+    // Use a small delay to ensure auth store is available
+    setTimeout(async () => {
+      try {
+        const { useAuthStore } = await import('../store/authStore');
+        let previousToken: string | null = null;
+        
+        // Get initial token
+        const initialState = useAuthStore.getState();
+        previousToken = initialState.accessToken;
+        
+        // Subscribe to auth store changes using Zustand's subscribe
+        const unsubscribe = useAuthStore.subscribe(
+          (state) => {
+            const currentToken = state.accessToken;
+            
+            // Check if access token changed
+            if (currentToken && currentToken !== previousToken) {
+              previousToken = currentToken;
+              
+              // Token was updated, update WebSocket connection
+              if (this.socket?.connected && this.userId) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('🔄 Token updated in auth store, updating WebSocket...');
+                }
+                this.updateSocketToken(currentToken);
+              }
+            }
+          }
+        );
+        
+        // Store unsubscribe function (will be cleaned up on disconnect)
+        (this as any)._tokenUnsubscribe = unsubscribe;
+      } catch (error) {
+        // Silently fail - token monitoring will still work via interval
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to setup token update listener:', error);
+        }
+      }
+    }, 1000);
   }
 
   // Message events

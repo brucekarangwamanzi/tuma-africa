@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Notification = require('../models/Notification');
+const { Notification } = require('../models');
 const { authenticateToken } = require('../middleware/auth');
 
 /**
@@ -47,23 +47,26 @@ const { authenticateToken } = require('../middleware/auth');
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 20, unreadOnly = false } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
 
-    const query = { userId: req.user._id };
+    const where = { userId: req.user.id };
     if (unreadOnly === 'true') {
-      query.read = false;
+      where.read = false;
     }
 
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip)
-      .lean();
+    const { count: total, rows: notifications } = await Notification.findAndCountAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit: limitNum,
+      offset
+    });
 
-    const total = await Notification.countDocuments(query);
-    const unreadCount = await Notification.countDocuments({ 
-      userId: req.user._id, 
-      read: false 
+    const unreadCount = await Notification.count({ 
+      where: { 
+        userId: req.user.id, 
+        read: false 
+      } 
     });
 
     res.json({
@@ -106,9 +109,11 @@ router.get('/', authenticateToken, async (req, res) => {
 // @access  Private
 router.get('/unread-count', authenticateToken, async (req, res) => {
   try {
-    const count = await Notification.countDocuments({ 
-      userId: req.user._id, 
-      read: false 
+    const count = await Notification.count({ 
+      where: { 
+        userId: req.user.id, 
+        read: false 
+      } 
     });
 
     res.json({ count });
@@ -129,9 +134,9 @@ router.post('/', authenticateToken, async (req, res) => {
     // Otherwise, create for the current user
     const targetUserId = (req.user.role === 'admin' || req.user.role === 'super_admin') && userId
       ? userId
-      : req.user._id;
+      : req.user.id;
 
-    const notification = new Notification({
+    const notification = await Notification.create({
       userId: targetUserId,
       type: type || 'system_announcement',
       title,
@@ -142,8 +147,6 @@ router.post('/', authenticateToken, async (req, res) => {
       priority: priority || 'medium',
       expiresAt: expiresAt ? new Date(expiresAt) : undefined
     });
-
-    await notification.save();
 
     // Emit Socket.IO event for real-time notification
     const io = req.app.get('io');
@@ -184,17 +187,20 @@ router.post('/', authenticateToken, async (req, res) => {
 router.put('/:id/read', authenticateToken, async (req, res) => {
   try {
     const notification = await Notification.findOne({
-      _id: req.params.id,
-      userId: req.user._id
+      where: {
+        id: req.params.id,
+        userId: req.user.id
+      }
     });
 
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
 
-    notification.read = true;
-    notification.readAt = new Date();
-    await notification.save();
+    await notification.update({
+      read: true,
+      readAt: new Date()
+    });
 
     res.json({ notification });
   } catch (error) {
@@ -208,19 +214,22 @@ router.put('/:id/read', authenticateToken, async (req, res) => {
 // @access  Private
 router.put('/read-all', authenticateToken, async (req, res) => {
   try {
-    const result = await Notification.updateMany(
-      { userId: req.user._id, read: false },
+    const [updatedCount] = await Notification.update(
       { 
-        $set: { 
-          read: true, 
-          readAt: new Date() 
-        } 
+        read: true, 
+        readAt: new Date() 
+      },
+      {
+        where: { 
+          userId: req.user.id, 
+          read: false 
+        }
       }
     );
 
     res.json({ 
       message: 'All notifications marked as read',
-      updatedCount: result.modifiedCount
+      updatedCount
     });
   } catch (error) {
     console.error('Mark all as read error:', error);
@@ -233,14 +242,18 @@ router.put('/read-all', authenticateToken, async (req, res) => {
 // @access  Private
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const notification = await Notification.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user._id
+    const notification = await Notification.findOne({
+      where: {
+        id: req.params.id,
+        userId: req.user.id
+      }
     });
 
     if (!notification) {
       return res.status(404).json({ message: 'Notification not found' });
     }
+
+    await notification.destroy();
 
     res.json({ message: 'Notification deleted successfully' });
   } catch (error) {
@@ -256,16 +269,16 @@ router.delete('/', authenticateToken, async (req, res) => {
   try {
     const { readOnly = false } = req.query;
 
-    const query = { userId: req.user._id };
+    const where = { userId: req.user.id };
     if (readOnly === 'true') {
-      query.read = true;
+      where.read = true;
     }
 
-    const result = await Notification.deleteMany(query);
+    const deletedCount = await Notification.destroy({ where });
 
     res.json({ 
       message: 'Notifications deleted successfully',
-      deletedCount: result.deletedCount
+      deletedCount
     });
   } catch (error) {
     console.error('Delete notifications error:', error);

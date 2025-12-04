@@ -1,117 +1,87 @@
-const mongoose = require('mongoose');
-
-const messageSchema = new mongoose.Schema({
-  sender: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  type: {
-    type: String,
-    enum: ['text', 'file', 'image', 'system'],
-    default: 'text'
-  },
-  text: {
-    type: String,
-    trim: true
-  },
-  fileUrl: String,
-  fileName: String,
-  fileSize: Number,
-  isRead: {
-    type: Boolean,
-    default: false
-  },
-  readAt: Date,
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-
-const chatSchema = new mongoose.Schema({
-  participants: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  }],
-  chatType: {
-    type: String,
-    enum: ['direct', 'support', 'group'],
-    default: 'support'
-  },
-  title: {
-    type: String,
-    trim: true
-  },
-  orderId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Order'
-  },
-  messages: [messageSchema],
-  lastMessage: {
-    text: String,
-    createdAt: Date,
-    sender: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+module.exports = (sequelize, DataTypes) => {
+  const Chat = sequelize.define('Chat', {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
+    },
+    chatType: {
+      type: DataTypes.ENUM('direct', 'support', 'group'),
+      defaultValue: 'support',
+      field: 'chat_type'
+    },
+    title: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    orderId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'order_id',
+      references: {
+        model: 'orders',
+        key: 'id'
+      }
+    },
+    lastMessageText: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'last_message_text'
+    },
+    lastMessageCreatedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'last_message_created_at'
+    },
+    lastMessageSender: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'last_message_sender',
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      field: 'is_active'
+    },
+    priority: {
+      type: DataTypes.ENUM('low', 'medium', 'high', 'urgent'),
+      defaultValue: 'medium'
+    },
+    status: {
+      type: DataTypes.ENUM('open', 'in_progress', 'resolved', 'closed'),
+      defaultValue: 'open'
+    },
+    assignedToId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'assigned_to_id',
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    tags: {
+      type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: []
+    },
+    metadata: {
+      type: DataTypes.JSONB,
+      defaultValue: {}
     }
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  priority: {
-    type: String,
-    enum: ['low', 'medium', 'high', 'urgent'],
-    default: 'medium'
-  },
-  status: {
-    type: String,
-    enum: ['open', 'in_progress', 'resolved', 'closed'],
-    default: 'open'
-  },
-  assignedTo: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  tags: [String],
-  metadata: {
-    userAgent: String,
-    ipAddress: String,
-    source: String
-  }
-}, {
-  timestamps: true
-});
+  }, {
+    tableName: 'chats',
+    timestamps: true,
+    underscored: false,
+    indexes: [
+      { fields: ['order_id'] },
+      { fields: ['last_message_created_at'] },
+      { fields: ['status', 'priority'] }
+    ]
+  });
 
-// Update lastMessage when new message is added
-chatSchema.pre('save', function(next) {
-  if (this.messages && this.messages.length > 0) {
-    const lastMsg = this.messages[this.messages.length - 1];
-    // Ensure lastMessage is properly set
-    if (lastMsg && lastMsg.createdAt) {
-      this.lastMessage = {
-        text: lastMsg.text || (lastMsg.fileName ? `Sent a file: ${lastMsg.fileName}` : 'File attachment'),
-        createdAt: lastMsg.createdAt,
-        sender: lastMsg.sender || this.participants[0]
-      };
-    }
-  }
-  next();
-});
-
-// Post-save hook to ensure messages are persisted
-chatSchema.post('save', function(doc) {
-  // Verify messages were saved
-  if (doc.messages && doc.messages.length > 0) {
-    console.log(`✅ Chat ${doc._id} saved with ${doc.messages.length} message(s)`);
-  }
-});
-
-// Indexes for better performance
-chatSchema.index({ participants: 1 });
-chatSchema.index({ orderId: 1 });
-chatSchema.index({ 'lastMessage.createdAt': -1 });
-chatSchema.index({ status: 1, priority: 1 });
-
-module.exports = mongoose.model('Chat', chatSchema);
+  return Chat;
+};

@@ -1,4 +1,4 @@
-const Notification = require('../models/Notification');
+const { Notification } = require('../models');
 
 /**
  * Create a notification for a user
@@ -27,8 +27,15 @@ async function createNotification({
   io = null
 }) {
   try {
-    const notification = new Notification({
-      userId,
+    // Support both PostgreSQL (id) and MongoDB (_id) for userId
+    const targetUserId = userId?.id || userId?._id || userId;
+    if (!targetUserId) {
+      throw new Error('User ID is required for notification');
+    }
+
+    // Create notification using Sequelize
+    const notification = await Notification.create({
+      userId: targetUserId,
       type,
       title,
       message,
@@ -39,16 +46,14 @@ async function createNotification({
       expiresAt: expiresAt ? new Date(expiresAt) : undefined
     });
 
-    await notification.save();
-
     // Emit Socket.IO event for real-time notification
     if (io) {
       // Convert userId to string for Socket.IO room
-      const userIdStr = userId.toString ? userId.toString() : String(userId);
+      const userIdStr = targetUserId.toString ? targetUserId.toString() : String(targetUserId);
       
-      // Convert notification to plain object for Socket.IO
-      const notificationData = notification.toObject ? notification.toObject() : {
-        _id: notification._id.toString(),
+      // Convert notification to plain object for Socket.IO (Sequelize instance)
+      const notificationData = {
+        id: notification.id.toString(),
         userId: notification.userId.toString(),
         type: notification.type,
         title: notification.title,
@@ -64,13 +69,15 @@ async function createNotification({
         updatedAt: notification.updatedAt
       };
       
+      // Emit to user's personal room
       io.to(`user:${userIdStr}`).emit('notification:new', notificationData);
-      console.log(`📬 Emitted notification to user:${userIdStr}`);
+      console.log(`📬 Emitted notification to user:${userIdStr} - ${title}`);
     }
 
     return notification;
   } catch (error) {
     console.error('Create notification error:', error);
+    console.error('Error stack:', error.stack);
     return null;
   }
 }
@@ -90,40 +97,44 @@ async function createOrderNotification(order, action, io = null) {
         title = 'Order Created';
         message = `Your order "${order.productName}" has been created successfully. Order ID: ${order.orderId}`;
         type = 'order_created';
-        link = `/orders/${order._id}`;
+        link = `/orders/${order.id || order._id || ''}`;
         priority = 'high';
         break;
       case 'status_changed':
         title = 'Order Status Updated';
         message = `Your order "${order.productName}" (${order.orderId}) status changed to ${order.status}`;
         type = 'order_update';
-        link = `/orders/${order._id}`;
+        link = `/orders/${order.id || order._id || ''}`;
         priority = order.status === 'cancelled' ? 'urgent' : 'high';
         break;
       case 'stage_updated':
         title = 'Order Progress Update';
         message = `Your order "${order.productName}" (${order.orderId}) has progressed to a new stage`;
         type = 'order_update';
-        link = `/orders/${order._id}`;
+        link = `/orders/${order.id || order._id || ''}`;
         priority = 'medium';
         break;
       case 'cancelled':
         title = 'Order Cancelled';
         message = `Your order "${order.productName}" (${order.orderId}) has been cancelled`;
         type = 'order_cancelled';
-        link = `/orders/${order._id}`;
+        link = `/orders/${order.id || order._id || ''}`;
         priority = 'urgent';
         break;
       default:
         return notifications;
     }
 
-    // Ensure userId is a valid ObjectId
-    const userId = order.userId?._id || order.userId || null;
+    // Support both PostgreSQL (id) and MongoDB (_id) for userId
+    const userId = order.userId?.id || order.userId?._id || order.userId || null;
     if (!userId) {
       console.error('Cannot create notification: userId is missing', order);
       return notifications;
     }
+
+    // Support both PostgreSQL (id) and MongoDB (_id) for order ID
+    const orderId = order.id || order._id || null;
+    const orderIdStr = orderId ? orderId.toString() : '';
 
     const userNotification = await createNotification({
       userId: userId,
@@ -132,11 +143,11 @@ async function createOrderNotification(order, action, io = null) {
       message,
       data: {
         orderId: order.orderId,
-        orderId_db: order._id ? order._id.toString() : '',
+        orderId_db: orderIdStr,
         status: order.status,
         productName: order.productName
       },
-      link,
+      link: orderIdStr ? `/orders/${orderIdStr}` : link,
       icon: 'package',
       priority,
       io
@@ -150,9 +161,9 @@ async function createOrderNotification(order, action, io = null) {
   // Notify admins about new orders (except for status updates)
   if (action === 'created' && io) {
     try {
-      // Emit to all admins
-      const orderId = order._id ? order._id.toString() : '';
-      const userId = order.userId?._id || order.userId || null;
+      // Support both PostgreSQL (id) and MongoDB (_id)
+      const orderId = (order.id || order._id || '').toString();
+      const userId = order.userId?.id || order.userId?._id || order.userId || null;
       const userName = order.userId?.fullName || 'Customer';
       
       io.to('admins').emit('notification:new', {
@@ -162,7 +173,7 @@ async function createOrderNotification(order, action, io = null) {
         data: {
           orderId: order.orderId,
           orderId_db: orderId,
-          userId: userId
+          userId: userId ? userId.toString() : null
         },
         link: orderId ? `/admin/orders/${orderId}` : '/admin/orders',
         icon: 'package',
@@ -184,24 +195,28 @@ async function createMessageNotification(chat, message, sender, io = null) {
 
   // Notify all participants except sender
   if (chat.participants && Array.isArray(chat.participants)) {
-    const senderId = sender._id ? sender._id.toString() : sender.toString();
-    console.log(`📧 Creating message notifications. Sender: ${senderId}, Participants: ${chat.participants.length}`);
+    // Support both PostgreSQL (id) and MongoDB (_id) for sender
+    const senderId = sender.id || sender._id || sender;
+    const senderIdStr = senderId.toString ? senderId.toString() : String(senderId);
+    console.log(`📧 Creating message notifications. Sender: ${senderIdStr}, Participants: ${chat.participants.length}`);
     
     for (const participant of chat.participants) {
-      // Handle both ObjectId and populated user objects
+      // Handle both Sequelize User objects and plain IDs
       let participantId;
-      if (participant._id) {
-        // Populated user object
+      if (participant.id) {
+        // Sequelize User object
+        participantId = participant.id.toString();
+      } else if (participant._id) {
+        // MongoDB ObjectId (backward compatibility)
         participantId = participant._id.toString();
       } else {
-        // Plain ObjectId
+        // Plain ID
         participantId = participant.toString();
       }
       
       // Skip if this is the sender
-      if (participantId !== senderId) {
+      if (participantId !== senderIdStr) {
         // Get message text - handle different message structures
-        // Chat messages use 'text' field, but also check for 'content' for compatibility
         let messageText = message.text || message.content || message.message;
         
         // If it's a file message, show appropriate text
@@ -214,37 +229,27 @@ async function createMessageNotification(chat, message, sender, io = null) {
           messageText = 'You have a new message';
         }
         
-        // Get message ID
-        const messageId = message._id ? message._id.toString() : (message.id || '');
+        // Get message ID - support both id and _id
+        const messageId = (message.id || message._id || '').toString();
         
-        // Get userId - handle both ObjectId and populated user objects
-        let userIdForNotification;
-        if (participant._id) {
-          // Populated user object
-          userIdForNotification = participant._id;
-        } else if (typeof participant === 'object' && participant.toString) {
-          // Plain ObjectId
-          userIdForNotification = participant;
-        } else {
-          // String ID - convert to ObjectId
-          const mongoose = require('mongoose');
-          userIdForNotification = mongoose.Types.ObjectId.isValid(participant) 
-            ? new mongoose.Types.ObjectId(participant) 
-            : participant;
-        }
+        // Get chat ID - support both id and _id
+        const chatId = (chat.id || chat._id || '').toString();
+        
+        // Get userId for notification - use the participant's ID
+        const userIdForNotification = participant.id || participant._id || participant;
         
         const notification = await createNotification({
-          userId: userIdForNotification, // Use ObjectId for database
+          userId: userIdForNotification,
           type: 'message_received',
           title: `New message from ${sender.fullName || sender.email || 'User'}`,
           message: messageText.length > 100 ? messageText.substring(0, 100) + '...' : messageText,
           data: {
-            chatId: chat._id.toString(),
+            chatId: chatId,
             messageId: messageId,
-            senderId: senderId,
+            senderId: senderIdStr,
             senderName: sender.fullName || sender.email || 'User'
           },
-          link: `/messages?chat=${chat._id}`,
+          link: `/messages?chat=${chatId}`,
           icon: 'message-circle',
           priority: 'high',
           io
@@ -270,15 +275,21 @@ async function createMessageNotification(chat, message, sender, io = null) {
  * Create account approval notification
  */
 async function createAccountApprovalNotification(user, approved, io = null) {
+  // Support both PostgreSQL (id) and MongoDB (_id)
+  const userId = user.id || user._id;
+  if (!userId) {
+    throw new Error('User ID is missing');
+  }
+  
   const notification = await createNotification({
-    userId: user._id,
+    userId: userId,
     type: approved ? 'account_approved' : 'account_rejected',
     title: approved ? 'Account Approved' : 'Account Rejected',
     message: approved
       ? 'Your account has been approved. You can now place orders and access all features.'
       : 'Your account registration has been rejected. Please contact support for more information.',
     data: {
-      userId: user._id.toString(),
+      userId: userId.toString ? userId.toString() : String(userId),
       approved
     },
     link: approved ? '/dashboard' : '/profile',

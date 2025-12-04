@@ -1,5 +1,5 @@
 const express = require('express');
-const AdminSettings = require('../models/AdminSettings');
+const { AdminSettings } = require('../models');
 
 const router = express.Router();
 
@@ -33,42 +33,46 @@ const router = express.Router();
 // @desc    Get public admin settings (no auth required)
 // @access  Public
 router.get('/settings', async (req, res) => {
+  // Default settings to return if database is not ready or no settings exist
+  const defaultSettings = {
+    heroSection: {
+      title: 'Connect Africa to Asia',
+      subtitle: 'Your trusted partner for cargo and product ordering from Asian suppliers',
+      backgroundType: 'color',
+      backgroundColor: '#3b82f6'
+    },
+    productSection: {
+      title: 'Featured Products',
+      subtitle: 'Discover our most popular items from trusted Asian suppliers',
+      displayCount: 8,
+      layout: 'grid'
+    },
+    companyInfo: {
+      name: 'Tuma-Africa Link Cargo',
+      tagline: 'Connecting Africa to Asia'
+    },
+    theme: {
+      primaryColor: '#3b82f6',
+      secondaryColor: '#64748b'
+    }
+  };
+
   try {
-    const settings = await AdminSettings.findOne().select('-_id -__v -lastUpdatedBy -version -createdAt -updatedAt');
+    // Try to get settings from database
+    const settingsDoc = await AdminSettings.getSettings();
     
-    if (!settings) {
-      // Return default settings if none exist
-      return res.json({
-        settings: {
-          heroSection: {
-            title: 'Connect Africa to Asia',
-            subtitle: 'Your trusted partner for cargo and product ordering from Asian suppliers',
-            backgroundType: 'color',
-            backgroundColor: '#3b82f6'
-          },
-          productSection: {
-            title: 'Featured Products',
-            subtitle: 'Discover our most popular items from trusted Asian suppliers',
-            displayCount: 8,
-            layout: 'grid'
-          },
-          companyInfo: {
-            name: 'Tuma-Africa Link Cargo',
-            tagline: 'Connecting Africa to Asia'
-          },
-          theme: {
-            primaryColor: '#3b82f6',
-            secondaryColor: '#64748b'
-          }
-        }
-      });
+    if (settingsDoc && settingsDoc.settings && Object.keys(settingsDoc.settings).length > 0) {
+      // Return settings from database
+      return res.json({ settings: settingsDoc.settings });
     }
 
-    res.json({ settings });
+    // Return default settings if none exist in database
+    return res.json({ settings: defaultSettings });
 
   } catch (error) {
-    console.error('Get public settings error:', error);
-    res.status(500).json({ message: 'Failed to fetch settings' });
+    // If there's any error (table doesn't exist, connection issue, etc.), return defaults
+    console.error('Get public settings error (returning defaults):', error.message);
+    return res.json({ settings: defaultSettings });
   }
 });
 

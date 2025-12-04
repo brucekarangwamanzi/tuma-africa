@@ -6,7 +6,8 @@ import { useAuthStore } from '../../store/authStore';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
 interface Product {
-  _id: string;
+  id?: string; // UUID from PostgreSQL
+  _id?: string; // Legacy MongoDB ID (for backward compatibility)
   name: string;
   description: string;
   price: number;
@@ -19,6 +20,11 @@ interface Product {
   featured: boolean;
 }
 
+// Helper function to get product ID (supports both id and _id)
+const getProductId = (product: Product): string => {
+  return product.id || product._id || '';
+};
+
 const ProductManagementCMS: React.FC = () => {
   const { user, accessToken } = useAuthStore();
   const [products, setProducts] = useState<Product[]>([]);
@@ -29,10 +35,10 @@ const ProductManagementCMS: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Ensure only super admin can access
+  // Ensure only admin or super admin can access
   useEffect(() => {
-    if (user && user.role !== 'super_admin') {
-      toast.error('Access denied. Super admin privileges required.');
+    if (user && user.role !== 'admin' && user.role !== 'super_admin') {
+      toast.error('Access denied. Admin privileges required.');
       return;
     }
   }, [user]);
@@ -51,8 +57,8 @@ const ProductManagementCMS: React.FC = () => {
   });
 
   useEffect(() => {
-    // Only fetch products if user is super admin
-    if (user && user.role === 'super_admin') {
+    // Fetch products if user is admin or super admin
+    if (user && (user.role === 'admin' || user.role === 'super_admin')) {
       fetchProducts();
     }
   }, [user]);
@@ -60,6 +66,11 @@ const ProductManagementCMS: React.FC = () => {
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
+      // Ensure axios default headers are set
+      if (accessToken) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
       // Get auth token from store or axios defaults
       const authToken = accessToken 
         ? `Bearer ${accessToken}` 
@@ -67,9 +78,15 @@ const ProductManagementCMS: React.FC = () => {
       
       if (!authToken) {
         console.warn('⚠️ No auth token available for fetching products');
+        console.warn('   User:', user?.email);
+        console.warn('   User Role:', user?.role);
+        toast.error('Authentication required. Please log in again.');
         setIsLoading(false);
         return;
       }
+      
+      console.log('📦 Fetching products with token:', authToken.substring(0, 20) + '...');
+      console.log('👤 User Role:', user?.role);
       
       // Use admin route to get all products (including inactive ones) sorted by newest first
       const response = await axios.get('/products/admin/all?limit=1000', {
@@ -79,11 +96,20 @@ const ProductManagementCMS: React.FC = () => {
       });
       setProducts(response.data.products || []);
     } catch (error: any) {
-      console.error('Failed to fetch products:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        toast.error('Authentication failed. Please log in again.');
+      console.error('❌ Failed to fetch products:', error);
+      console.error('   Status:', error.response?.status);
+      console.error('   Message:', error.response?.data?.message);
+      console.error('   User Role:', user?.role);
+      console.error('   Has Token:', !!accessToken);
+      
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+      } else if (error.response?.status === 403) {
+        const errorMessage = error.response?.data?.message || 'Access denied';
+        toast.error(`Access denied: ${errorMessage}. Only admins can access this page.`);
+        console.error('   Access denied. User role:', user?.role);
       } else {
-        toast.error('Failed to load products');
+        toast.error(error.response?.data?.message || 'Failed to load products');
       }
     } finally {
       setIsLoading(false);
@@ -181,10 +207,10 @@ const ProductManagementCMS: React.FC = () => {
     console.log('📋 Form data:', formData);
     console.log('👤 User:', user);
 
-    // Check if user is super admin
-    if (!user || user.role !== 'super_admin') {
-      toast.error('Only super admins can create products');
-      console.error('❌ User is not super admin:', user?.role);
+    // Check if user is admin or super admin
+    if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+      toast.error('Only admins can create products');
+      console.error('❌ User is not admin:', user?.role);
       return;
     }
 
@@ -278,7 +304,8 @@ const ProductManagementCMS: React.FC = () => {
         }
         
         console.log('🔄 Updating product with payload:', updatePayload);
-        console.log('📦 Product ID:', editingProduct._id);
+        const productId = getProductId(editingProduct);
+        console.log('📦 Product ID:', productId);
         
         // Get auth token from store or axios defaults
         const authToken = accessToken 
@@ -291,7 +318,7 @@ const ProductManagementCMS: React.FC = () => {
           return;
         }
         
-        const response = await axios.put(`/products/${editingProduct._id}`, updatePayload, {
+        const response = await axios.put(`/products/${productId}`, updatePayload, {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': authToken
@@ -438,7 +465,8 @@ const ProductManagementCMS: React.FC = () => {
         // Handle different response structures
         const newProduct = response.data.product || response.data;
         
-        if (!newProduct || !newProduct._id) {
+        // Check for both _id (MongoDB) and id (PostgreSQL/UUID)
+        if (!newProduct || (!newProduct._id && !newProduct.id)) {
           console.error('❌ Invalid product response:', response.data);
           toast.error('Product created but invalid response received');
           setIsSubmitting(false);
@@ -487,9 +515,10 @@ const ProductManagementCMS: React.FC = () => {
         // Add product to list immediately (optimistic update)
         setProducts(prev => {
           // Check if product already exists (avoid duplicates)
-          const exists = prev.some(p => p._id === newProduct._id);
+          const productId = getProductId(newProduct);
+          const exists = prev.some(p => getProductId(p) === productId);
           if (exists) {
-            return prev.map(p => p._id === newProduct._id ? newProduct : p);
+            return prev.map(p => getProductId(p) === productId ? newProduct : p);
           }
           return [newProduct, ...prev];
         });
@@ -661,15 +690,15 @@ const ProductManagementCMS: React.FC = () => {
     product.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Show access denied if not super admin
-  if (user && user.role !== 'super_admin') {
+  // Show access denied if not admin or super admin
+  if (user && user.role !== 'admin' && user.role !== 'super_admin') {
     return (
       <div className="bg-white rounded-lg shadow-soft p-6">
         <div className="text-center py-12">
           <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
           <p className="text-gray-600">
-            Only Super Admins can manage products. Please contact your administrator.
+            Only Admins can manage products. Please contact your administrator.
           </p>
         </div>
       </div>
@@ -717,7 +746,7 @@ const ProductManagementCMS: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProducts.map((product) => (
             <div
-              key={product._id}
+              key={getProductId(product)}
               className="border rounded-lg p-4 hover:shadow-md transition-shadow"
             >
               <div className="relative mb-3">
@@ -747,7 +776,7 @@ const ProductManagementCMS: React.FC = () => {
               <h3 className="font-medium text-gray-900 truncate">{product.name}</h3>
               <p className="text-sm text-gray-600 line-clamp-2 mb-2">{product.description}</p>
               <p className="text-lg font-semibold text-primary mb-3">
-                {product.currency === 'RWF' ? 'RWF' : product.currency === 'Yuan' ? '¥' : '$'}{product.price.toLocaleString()}
+                {product.currency === 'RWF' ? 'RWF' : product.currency === 'Yuan' ? '¥' : '$'}{typeof product.price === 'string' ? parseFloat(product.price).toLocaleString() : product.price.toLocaleString()}
               </p>
               <div className="flex flex-wrap gap-2 mb-3">
                 <span className="inline-block px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
@@ -777,7 +806,7 @@ const ProductManagementCMS: React.FC = () => {
                   Edit
                 </button>
                 <button
-                  onClick={() => handleDelete(product._id)}
+                  onClick={() => handleDelete(getProductId(product))}
                   className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
                   title="Delete product permanently"
                 >

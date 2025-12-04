@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -121,19 +120,25 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   }
 }));
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/tuma-africa-cargo', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  console.log('✅ MongoDB connected successfully');
-  console.log(`📊 Database: ${process.env.MONGODB_URI ? 'Remote' : 'Local (mongodb://localhost:27017/tuma-africa-cargo)'}`);
-})
-.catch(err => {
-  console.error('❌ MongoDB connection error:', err.message);
-  console.error('💡 Make sure MongoDB is running and MONGODB_URI is correct');
-});
+// Database connection - PostgreSQL
+const { sequelize, testConnection } = require('./config/database');
+const models = require('./models');
+
+// Initialize database connection
+(async () => {
+  try {
+    const connected = await testConnection();
+    if (connected) {
+      // Skip auto-sync - use migrations instead
+      // Run: npx sequelize-cli db:migrate
+      console.log('✅ Database connected');
+      console.log('💡 To create tables, run: cd backend && npx sequelize-cli db:migrate');
+    }
+  } catch (error) {
+    console.error('❌ Database connection error:', error.message);
+    console.error('⚠️  Server will continue but database features may not work');
+  }
+})();
 
 // Health check endpoint (must be before other routes)
 app.use('/api', require('./health'));
@@ -229,8 +234,8 @@ const io = require('socket.io')(server, {
 app.set('io', io);
 
 // Socket.IO connection handling
-const Chat = require('./models/Chat');
-const User = require('./models/User');
+const { Chat, User, Message, ChatParticipants } = require('./models');
+const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const { createMessageNotification } = require('./utils/notifications');
 
@@ -243,11 +248,13 @@ io.use(async (socket, next) => {
     }
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    socket.userId = decoded.id;
+    socket.userId = decoded.id || decoded.userId; // Support both id and userId from token
     socket.userRole = decoded.role;
     
-    // Get user details
-    const user = await User.findById(decoded.id).select('fullName email role');
+    // Get user details using Sequelize
+    const user = await User.findByPk(socket.userId, {
+      attributes: ['id', 'fullName', 'email', 'role']
+    });
     if (!user) {
       return next(new Error('Authentication error: User not found'));
     }
@@ -312,95 +319,122 @@ io.on('connection', (socket) => {
         return;
       }
       
-      // Find or create chat - Enhanced logic
+      // Find or create chat - Enhanced logic using Sequelize
       if (chatId) {
-        chat = await Chat.findById(chatId);
+        chat = await Chat.findByPk(chatId, {
+          include: [
+            { model: User, as: 'participants', attributes: ['id', 'fullName', 'email', 'role'] },
+            { model: Message, as: 'messages', limit: 1, order: [['createdAt', 'DESC']] }
+          ]
+        });
       }
       
       if (!chat) {
-        // Try to find existing support chat for this user
-        chat = await Chat.findOne({
-          participants: socket.userId,
-          chatType: 'support'
+        // Try to find existing support chat for this user using Sequelize
+        const userChats = await Chat.findAll({
+          where: { chatType: 'support' },
+          include: [{
+            model: User,
+            as: 'participants',
+            where: { id: socket.userId },
+            attributes: ['id']
+          }]
         });
         
-        if (!chat) {
+        if (userChats.length > 0) {
+          chat = userChats[0];
+          // Reload with full data
+          chat = await Chat.findByPk(chat.id, {
+            include: [
+              { model: User, as: 'participants', attributes: ['id', 'fullName', 'email', 'role'] }
+            ]
+          });
+        } else {
           // Create new chat if doesn't exist
           const admin = await User.findOne({ 
-            role: { $in: ['admin', 'super_admin'] }, 
-            isActive: true 
-          }).sort({ createdAt: 1 }); // Get first admin
+            where: { 
+              role: { [Op.in]: ['admin', 'super_admin'] }, 
+              isActive: true 
+            },
+            order: [['createdAt', 'ASC']] // Get first admin
+          });
           
-          const participants = [socket.userId];
-          if (admin) {
-            participants.push(admin._id);
-          }
-          
-          chat = new Chat({
-            participants,
+          // Create chat
+          chat = await Chat.create({
             chatType: 'support',
             title: `Support Chat - ${socket.userName}`,
             status: 'open',
-            priority: 'medium',
-            messages: []
+            priority: 'medium'
           });
           
-          await chat.save();
-          console.log(`✅ Created new chat ${chat._id} for ${socket.userName} with ${participants.length} participants`);
-        } else {
-          console.log(`✅ Found existing chat ${chat._id} for ${socket.userName}`);
+          // Add participants using Sequelize association
+          await chat.addParticipants([socket.userId]);
+          if (admin) {
+            await chat.addParticipants([admin.id]);
+          }
+          
+          // Reload with participants
+          chat = await Chat.findByPk(chat.id, {
+            include: [
+              { model: User, as: 'participants', attributes: ['id', 'fullName', 'email', 'role'] }
+            ]
+          });
+          
+          console.log(`✅ Created new chat ${chat.id} for ${socket.userName}`);
+        }
+      } else {
+        // Ensure current user is in participants
+        const participants = chat.participants || [];
+        const userIdStr = socket.userId.toString();
+        const isParticipant = participants.some(p => p.id.toString() === userIdStr);
+        if (!isParticipant) {
+          await chat.addParticipants([socket.userId]);
+          // Reload to get updated participants
+          chat = await Chat.findByPk(chat.id, {
+            include: [
+              { model: User, as: 'participants', attributes: ['id', 'fullName', 'email', 'role'] }
+            ]
+          });
+          console.log(`➕ Added ${socket.userName} to chat participants`);
         }
       }
       
-      // Ensure current user is in participants
-      const userIdStr = socket.userId.toString();
-      const isParticipant = chat.participants.some(p => p.toString() === userIdStr);
-      if (!isParticipant) {
-        chat.participants.push(socket.userId);
-        console.log(`➕ Added ${socket.userName} to chat participants`);
-      }
-      
-      // Add message to chat - Include all fields
-      const newMessage = {
+      // Create message using Message model
+      savedMessage = await Message.create({
+        chatId: chat.id,
         sender: socket.userId,
         type: message.type || 'text',
         text: message.content || '',
         fileUrl: message.fileUrl,
         fileName: message.fileName,
-        fileSize: message.fileSize || (message.fileUrl ? undefined : undefined), // Include if provided
-        createdAt: new Date(),
+        fileSize: message.fileSize,
         isRead: false
-      };
+      });
       
-      chat.messages.push(newMessage);
-      chat.lastMessage = {
-        text: message.content || (message.fileName ? `Sent a file: ${message.fileName}` : 'File attachment'),
-        createdAt: new Date(),
-        sender: socket.userId
-      };
+      // Update chat last message info
+      await chat.update({
+        lastMessageText: message.content || (message.fileName ? `Sent a file: ${message.fileName}` : 'File attachment'),
+        lastMessageCreatedAt: new Date(),
+        lastMessageSender: socket.userId
+      });
       
       // Update chat status if closed
       if (chat.status === 'closed') {
+        await chat.update({ status: 'open' });
         chat.status = 'open';
       }
       
-      // Save to database - CRITICAL: Save before emitting
-      await chat.save();
-      console.log(`💾 Saved message to database in chat ${chat._id}`);
+      console.log(`💾 Saved message ${savedMessage.id} to database in chat ${chat.id}`);
       
-      // Reload chat to get the saved message with _id
-      chat = await Chat.findById(chat._id);
-      savedMessage = chat.messages[chat.messages.length - 1];
-      
-      if (!savedMessage || !savedMessage._id) {
+      if (!savedMessage || !savedMessage.id) {
         throw new Error('Failed to retrieve saved message');
       }
       
       // Prepare message data for emission
       const messageData = {
-        chatId: chat._id.toString(),
+        chatId: chat.id.toString(),
         message: {
-          id: savedMessage._id.toString(),
+          id: savedMessage.id.toString(),
           senderId: socket.userId,
           senderName: socket.userName,
           senderRole: socket.userRole,
@@ -416,11 +450,13 @@ io.on('connection', (socket) => {
       
       // Emit to sender (confirmation) - Only after successful save
       socket.emit('message:new', messageData);
-      console.log(`📤 Confirmed message ${savedMessage._id} to sender`);
+      console.log(`📤 Confirmed message ${savedMessage.id} to sender`);
       
       // Emit to all participants except sender - Target specific users in the chat
-      const participantIds = chat.participants.map(p => p.toString());
-      participantIds.forEach(participantId => {
+      const participants = chat.participants || [];
+      const userIdStr = socket.userId.toString();
+      participants.forEach(participant => {
+        const participantId = participant.id.toString();
         if (participantId !== userIdStr) {
           // Emit to specific user
           io.to(`user:${participantId}`).emit('message:new', messageData);
@@ -438,11 +474,11 @@ io.on('connection', (socket) => {
 
       // Create notifications for message (non-blocking)
       try {
-        const sender = await User.findById(socket.userId).select('fullName email role');
+        const sender = await User.findByPk(socket.userId, {
+          attributes: ['id', 'fullName', 'email', 'role']
+        });
         if (sender) {
-          // Always populate participants to ensure we have user data
-          await chat.populate('participants', 'fullName email role');
-          
+          // Chat already has participants loaded from include above
           // Create notifications for all participants except sender
           const notifications = await createMessageNotification(chat, savedMessage, sender, io);
           console.log(`📧 Created ${notifications.length} notification(s) for message`);
@@ -453,7 +489,7 @@ io.on('connection', (socket) => {
               console.log(`  → Notification for user ${notif.userId}: ${notif.title}`);
             });
           } else {
-            console.warn(`⚠️ No notifications created. Chat has ${chat.participants.length} participants, sender is ${sender._id}`);
+            console.warn(`⚠️ No notifications created. Chat has ${participants.length} participants, sender is ${sender.id}`);
           }
         }
       } catch (notifError) {
@@ -468,7 +504,7 @@ io.on('connection', (socket) => {
       
       // Try to save message to a recovery queue or log for manual processing
       if (chat && savedMessage) {
-        console.error(`⚠️ Message may be lost! Chat: ${chat._id}, Message content: ${savedMessage.text?.substring(0, 50)}`);
+        console.error(`⚠️ Message may be lost! Chat: ${chat.id}, Message content: ${savedMessage.text?.substring(0, 50)}`);
       }
       
       socket.emit('error', { 
@@ -482,12 +518,15 @@ io.on('connection', (socket) => {
   socket.on('user:typing:start', async (data) => {
     try {
       const { chatId } = data;
-      const chat = await Chat.findById(chatId);
+      const chat = await Chat.findByPk(chatId, {
+        include: [{ model: User, as: 'participants', attributes: ['id'] }]
+      });
       
-      if (chat) {
+      if (chat && chat.participants) {
         // Notify other participants
-        chat.participants.forEach(participantId => {
-          if (participantId.toString() !== socket.userId) {
+        chat.participants.forEach(participant => {
+          const participantId = participant.id.toString();
+          if (participantId !== socket.userId.toString()) {
             io.to(`user:${participantId}`).emit('user:typing', {
               chatId,
               userId: socket.userId,
@@ -515,12 +554,15 @@ io.on('connection', (socket) => {
   socket.on('user:typing:stop', async (data) => {
     try {
       const { chatId } = data;
-      const chat = await Chat.findById(chatId);
+      const chat = await Chat.findByPk(chatId, {
+        include: [{ model: User, as: 'participants', attributes: ['id'] }]
+      });
       
-      if (chat) {
+      if (chat && chat.participants) {
         // Notify other participants
-        chat.participants.forEach(participantId => {
-          if (participantId.toString() !== socket.userId) {
+        chat.participants.forEach(participant => {
+          const participantId = participant.id.toString();
+          if (participantId !== socket.userId.toString()) {
             io.to(`user:${participantId}`).emit('user:typing', {
               chatId,
               userId: socket.userId,
@@ -549,25 +591,24 @@ io.on('connection', (socket) => {
   socket.on('message:read', async (data) => {
     try {
       const { chatId, messageId } = data;
-      const chat = await Chat.findById(chatId);
+      const { Message } = require('./models');
+      const message = await Message.findByPk(messageId);
       
-      if (chat) {
-        const message = chat.messages.id(messageId);
-        if (message) {
-          message.isRead = true;
-          message.readAt = new Date();
-          await chat.save();
-          
-          // Notify sender
-          io.to(`user:${message.sender}`).emit('message:read', {
-            chatId,
-            messageId,
-            readBy: socket.userId,
-            readAt: new Date()
-          });
-          
-          console.log(`✓ Message ${messageId} marked as read by ${socket.userName}`);
-        }
+      if (message && message.chatId.toString() === chatId) {
+        await message.update({
+          isRead: true,
+          readAt: new Date()
+        });
+        
+        // Notify sender
+        io.to(`user:${message.sender}`).emit('message:read', {
+          chatId,
+          messageId,
+          readBy: socket.userId,
+          readAt: new Date()
+        });
+        
+        console.log(`✓ Message ${messageId} marked as read by ${socket.userName}`);
       }
     } catch (error) {
       console.error('Mark read error:', error);

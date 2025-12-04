@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { User } = require('../models');
 
 // Verify JWT token
 const authenticateToken = async (req, res, next) => {
@@ -13,7 +13,9 @@ const authenticateToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.userId || decoded.id;
-    const user = await User.findById(userId).select('-passwordHash -refreshToken');
+    const user = await User.findByPk(userId, {
+      attributes: { exclude: ['passwordHash', 'refreshToken'] }
+    });
     
     if (!user || !user.isActive) {
       return res.status(401).json({ message: 'Invalid token or user not found' });

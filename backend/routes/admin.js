@@ -1,8 +1,6 @@
 const express = require('express');
-const AdminSettings = require('../models/AdminSettings');
-const User = require('../models/User');
-const Order = require('../models/Order');
-const Product = require('../models/Product');
+const { Op } = require('sequelize');
+const { AdminSettings, User, Order, Product, sequelize } = require('../models');
 const { createAccountApprovalNotification } = require('../utils/notifications');
 const { authenticateToken, requireRole, sensitiveOperation } = require('../middleware/auth');
 const { validateAdminSettings, validatePagination } = require('../middleware/validation');
@@ -57,23 +55,32 @@ router.post('/settings', authenticateToken, requireRole(['super_admin']), sensit
     }
     
     if (!settings) {
-      settings = new AdminSettings(req.body);
+      settings = await AdminSettings.create({
+        ...req.body,
+        lastUpdatedById: req.user.id,
+        version: 1
+      });
     } else {
       // Deep merge the settings
+      const updatedSettings = { ...settings.settings };
       Object.keys(req.body).forEach(key => {
-        if (typeof req.body[key] === 'object' && !Array.isArray(req.body[key])) {
-          settings[key] = { ...settings[key], ...req.body[key] };
-        } else {
-          settings[key] = req.body[key];
+        if (key === 'settings' && typeof req.body[key] === 'object') {
+          Object.assign(updatedSettings, req.body[key]);
+        } else if (key !== 'settings') {
+          // Handle non-settings fields if any
         }
+      });
+
+      await settings.update({
+        settings: updatedSettings,
+        lastUpdatedById: req.user.id,
+        version: (settings.version || 0) + 1
       });
     }
 
-    settings.lastUpdatedBy = req.user._id;
-    settings.version += 1;
-    
-    await settings.save();
-    await settings.populate('lastUpdatedBy', 'fullName email');
+    await settings.reload({
+      include: [{ model: User, as: 'lastUpdater', attributes: ['id', 'fullName', 'email'] }]
+    });
 
     res.json({
       message: 'Settings updated successfully',
@@ -123,84 +130,121 @@ router.get('/dashboard', authenticateToken, requireRole(['admin', 'super_admin']
   try {
     // Get basic stats
     const [userCount, orderCount, productCount, pendingOrders] = await Promise.all([
-      User.countDocuments({ role: 'user' }),
-      Order.countDocuments(),
-      Product.countDocuments({ isActive: true }),
-      Order.countDocuments({ status: 'pending' })
+      User.count({ where: { role: 'user' } }),
+      Order.count(),
+      Product.count({ where: { isActive: true } }),
+      Order.count({ where: { status: 'pending' } })
     ]);
 
     // Get order status distribution
-    const orderStats = await Order.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          totalValue: { $sum: '$finalAmount' }
-        }
-      }
-    ]);
+    const orderStats = await Order.findAll({
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+        [sequelize.fn('SUM', sequelize.cast(sequelize.col('final_amount'), 'DECIMAL')), 'totalValue']
+      ],
+      group: ['status'],
+      raw: true
+    });
+
+    // Format orderStats to match expected format
+    const formattedOrderStats = orderStats.map(stat => ({
+      _id: stat.status,
+      count: parseInt(stat.count) || 0,
+      totalValue: parseFloat(stat.totalValue) || 0
+    }));
 
     // Get recent orders
-    const recentOrders = await Order.find()
-      .populate('userId', 'fullName email')
-      .populate('assignedEmployee', 'fullName')
-      .sort({ createdAt: -1 })
-      .limit(10);
+    const recentOrders = await Order.findAll({
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'fullName', 'email'] },
+        { model: User, as: 'assignedEmployeeUser', attributes: ['id', 'fullName'] }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: 10
+    });
 
     // Get monthly revenue (last 12 months)
-    const monthlyRevenue = await Order.aggregate([
-      {
-        $match: {
-          createdAt: {
-            $gte: new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)
-          },
-          status: { $in: ['delivered', 'shipped'] }
-        }
+    const monthlyRevenue = await Order.findAll({
+      attributes: [
+        [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt')), 'month'],
+        [sequelize.fn('SUM', sequelize.cast(sequelize.col('final_amount'), 'DECIMAL')), 'revenue'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'orders']
+      ],
+      where: {
+        createdAt: {
+          [Op.gte]: new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)
+        },
+        status: { [Op.in]: ['delivered', 'shipped'] }
       },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          revenue: { $sum: '$finalAmount' },
-          orders: { $sum: 1 }
-        }
+      group: [sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('DATE_TRUNC', 'month', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    // Format monthlyRevenue to match expected format
+    const formattedMonthlyRevenue = monthlyRevenue.map(rev => ({
+      _id: {
+        year: new Date(rev.month).getFullYear(),
+        month: new Date(rev.month).getMonth() + 1
       },
-      { $sort: { '_id.year': 1, '_id.month': 1 } }
-    ]);
+      revenue: parseFloat(rev.revenue) || 0,
+      orders: parseInt(rev.orders) || 0
+    }));
 
     // Get top products
-    const topProducts = await Product.find({ isActive: true })
-      .sort({ 'popularity.orders': -1 })
-      .limit(5)
-      .select('name popularity.orders popularity.views');
+    const topProducts = await Product.findAll({
+      where: { isActive: true },
+      attributes: [
+        'name',
+        [sequelize.literal("(popularity->>'orders')::int"), 'orders'],
+        [sequelize.literal("(popularity->>'views')::int"), 'views']
+      ],
+      order: [[sequelize.literal("(popularity->>'orders')::int"), 'DESC']],
+      limit: 5,
+      raw: true
+    });
+
+    // Format topProducts to match expected format
+    const formattedTopProducts = topProducts.map(product => ({
+      name: product.name,
+      popularity: {
+        orders: parseInt(product.orders) || 0,
+        views: parseInt(product.views) || 0
+      }
+    }));
 
     // Get user registrations (last 30 days)
-    const userRegistrations = await User.aggregate([
-      {
-        $match: {
-          createdAt: {
-            $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-          }
-        }
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const userRegistrations = await User.findAll({
+      attributes: [
+        [sequelize.fn('DATE', sequelize.col('createdAt')), 'date'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: {
+        createdAt: { [Op.gte]: thirtyDaysAgo }
       },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { '_id': 1 } }
-    ]);
+      group: [sequelize.fn('DATE', sequelize.col('createdAt'))],
+      order: [[sequelize.fn('DATE', sequelize.col('createdAt')), 'ASC']],
+      raw: true
+    });
+
+    // Format userRegistrations to match expected format
+    const formattedUserRegistrations = userRegistrations.map(reg => ({
+      _id: reg.date,
+      count: parseInt(reg.count) || 0
+    }));
 
     // Calculate total revenue from delivered orders
-    const totalRevenue = await Order.aggregate([
-      { $match: { status: { $in: ['delivered', 'shipped'] } } },
-      { $group: { _id: null, total: { $sum: '$finalAmount' } } }
-    ]);
+    const totalRevenueResult = await Order.findAll({
+      attributes: [
+        [sequelize.fn('SUM', sequelize.cast(sequelize.col('final_amount'), 'DECIMAL')), 'total']
+      ],
+      where: { status: { [Op.in]: ['delivered', 'shipped'] } },
+      raw: true
+    });
+
+    const totalRevenue = parseFloat(totalRevenueResult[0]?.total) || 0;
 
     // Calculate monthly growth (simplified - comparing this month vs last month)
     const thisMonth = new Date();
@@ -208,11 +252,13 @@ router.get('/dashboard', authenticateToken, requireRole(['admin', 'super_admin']
     const thisMonthStart = new Date(thisMonth.getFullYear(), thisMonth.getMonth(), 1);
 
     const [thisMonthOrders, lastMonthOrders] = await Promise.all([
-      Order.countDocuments({ createdAt: { $gte: thisMonthStart } }),
-      Order.countDocuments({ 
-        createdAt: { 
-          $gte: lastMonth, 
-          $lt: thisMonthStart 
+      Order.count({ where: { createdAt: { [Op.gte]: thisMonthStart } } }),
+      Order.count({ 
+        where: { 
+          createdAt: { 
+            [Op.gte]: lastMonth, 
+            [Op.lt]: thisMonthStart 
+          } 
         } 
       })
     ]);
@@ -226,19 +272,19 @@ router.get('/dashboard', authenticateToken, requireRole(['admin', 'super_admin']
         totalUsers: userCount,
         totalOrders: orderCount,
         pendingOrders,
-        totalRevenue: totalRevenue[0]?.total || 0,
+        totalRevenue,
         monthlyGrowth: parseFloat(monthlyGrowth)
       },
-      orderStats,
+      orderStats: formattedOrderStats,
       recentOrders,
-      monthlyRevenue,
-      topProducts,
-      userRegistrations
+      monthlyRevenue: formattedMonthlyRevenue,
+      topProducts: formattedTopProducts,
+      userRegistrations: formattedUserRegistrations
     });
 
   } catch (error) {
     console.error('Get dashboard error:', error);
-    res.status(500).json({ message: 'Failed to fetch dashboard data' });
+    res.status(500).json({ message: 'Failed to fetch dashboard data', error: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 });
 
@@ -260,20 +306,20 @@ router.get('/users', authenticateToken, requireRole(['admin', 'super_admin']), v
     if (verified !== undefined) query.verified = verified === 'true';
     
     if (search) {
-      query.$or = [
-        { fullName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { phone: { $regex: search, $options: 'i' } }
+      query[Op.or] = [
+        { fullName: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } },
+        { phone: { [Op.iLike]: `%${search}%` } }
       ];
     }
 
-    const users = await User.find(query)
-      .select('-passwordHash -refreshToken')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await User.countDocuments(query);
+    const { count: total, rows: users } = await User.findAndCountAll({
+      where: query,
+      attributes: { exclude: ['passwordHash', 'refreshToken'] },
+      order: [['createdAt', 'DESC']],
+      offset: skip,
+      limit
+    });
 
     res.json({
       users,
@@ -299,8 +345,9 @@ router.get('/users/:userId', authenticateToken, requireRole(['admin', 'super_adm
   try {
     const { userId } = req.params;
 
-    const user = await User.findById(userId)
-      .select('-passwordHash -refreshToken');
+    const user = await User.findByPk(userId, {
+      attributes: { exclude: ['passwordHash', 'refreshToken'] }
+    });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -322,14 +369,13 @@ router.put('/users/:userId/approve', authenticateToken, requireRole(['admin', 's
     const { userId } = req.params;
     const { approved } = req.body;
 
-    const user = await User.findById(userId);
+    const user = await User.findByPk(userId);
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    user.approved = approved;
-    await user.save();
+    await user.update({ approved });
 
     // Create notification for account approval/rejection
     const io = req.app.get('io');
@@ -338,7 +384,7 @@ router.put('/users/:userId/approve', authenticateToken, requireRole(['admin', 's
     res.json({
       message: `User ${approved ? 'approved' : 'disapproved'} successfully`,
       user: {
-        id: user._id,
+        id: user.id,
         fullName: user.fullName,
         email: user.email,
         approved: user.approved
@@ -363,14 +409,14 @@ router.put('/users/:userId/role', authenticateToken, requireRole(['admin', 'supe
       return res.status(400).json({ message: 'Invalid role' });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findByPk(userId);
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     // Prevent changing own role
-    if (user._id.toString() === req.user._id.toString()) {
+    if (user.id === req.user.id) {
       return res.status(400).json({ message: 'Cannot change your own role' });
     }
 
@@ -384,13 +430,12 @@ router.put('/users/:userId/role', authenticateToken, requireRole(['admin', 'supe
       return res.status(403).json({ message: 'Only super admins can modify other super admins' });
     }
 
-    user.role = role;
-    await user.save();
+    await user.update({ role });
 
     res.json({
       message: 'User role updated successfully',
       user: {
-        id: user._id,
+        id: user.id,
         fullName: user.fullName,
         email: user.email,
         role: user.role
@@ -410,14 +455,14 @@ router.delete('/users/:userId', authenticateToken, requireRole(['admin', 'super_
   try {
     const { userId } = req.params;
 
-    const user = await User.findById(userId);
+    const user = await User.findByPk(userId);
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     // Prevent deactivating own account
-    if (user._id.toString() === req.user._id.toString()) {
+    if (user.id === req.user.id) {
       return res.status(400).json({ message: 'Cannot deactivate your own account' });
     }
 
@@ -426,9 +471,10 @@ router.delete('/users/:userId', authenticateToken, requireRole(['admin', 'super_
       return res.status(403).json({ message: 'Cannot deactivate super admin' });
     }
 
-    user.isActive = false;
-    user.refreshToken = undefined; // Logout user
-    await user.save();
+    await user.update({ 
+      isActive: false,
+      refreshToken: null // Logout user
+    });
 
     res.json({ message: 'User deactivated successfully' });
 

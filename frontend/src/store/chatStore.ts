@@ -71,6 +71,8 @@ export const useChatStore = create<ChatState>()(
       const response = await axios.get('/chat/messages');
       const { messages, chatId } = response.data;
       
+      console.log(`📥 Server response - chatId: ${chatId}, messages count: ${messages?.length || 0}`);
+      
       // Ensure messages are sorted by timestamp
       const sortedMessages = (messages || []).sort((a: Message, b: Message) => 
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()

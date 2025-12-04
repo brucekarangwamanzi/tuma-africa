@@ -7,11 +7,12 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { useAuthStore } from '../store/authStore';
 
 interface Product {
-  _id: string;
+  id?: string; // UUID from PostgreSQL
+  _id?: string; // Legacy MongoDB ID (for backward compatibility)
   name: string;
   description: string;
-  price: number;
-  originalPrice?: number;
+  price: number | string; // Can be string from PostgreSQL DECIMAL
+  originalPrice?: number | string; // Can be string from PostgreSQL DECIMAL
   currency: string;
   imageUrl: string;
   images: string[];
@@ -63,6 +64,21 @@ interface Product {
   isActive: boolean;
   createdAt: string;
 }
+
+// Helper function to get product ID
+const getProductId = (product: Product): string => {
+  return product.id || product._id || '';
+};
+
+// Helper function to safely convert price to number
+const getPriceNumber = (price: number | string): number => {
+  return typeof price === 'string' ? parseFloat(price) : price;
+};
+
+// Helper function to format price with 2 decimal places
+const formatPrice = (price: number | string): string => {
+  return getPriceNumber(price).toFixed(2);
+};
 
 const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -291,12 +307,12 @@ const ProductDetailPage: React.FC = () => {
             <div className="border-t border-b border-gray-200 py-6">
               <div className="flex items-center space-x-4 mb-4">
                 <span className="text-3xl font-bold text-primary-600">
-                  ${product.price.toFixed(2)}
+                  ${formatPrice(product.price)}
                 </span>
-                {product.originalPrice && product.originalPrice > product.price && (
+                {product.originalPrice && getPriceNumber(product.originalPrice) > getPriceNumber(product.price) && (
                   <>
                     <span className="text-xl text-gray-500 line-through">
-                      ${product.originalPrice.toFixed(2)}
+                      ${formatPrice(product.originalPrice)}
                     </span>
                     {product.discountPercentage && (
                       <span className="badge badge-error">
@@ -396,7 +412,7 @@ const ProductDetailPage: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Subtotal ({quantity} {quantity === 1 ? 'item' : 'items'}):</span>
                     <span className="text-lg font-bold text-primary-600">
-                      ${(product.price * quantity).toFixed(2)}
+                      ${(getPriceNumber(product.price) * quantity).toFixed(2)}
                     </span>
                   </div>
                   {product.shipping?.cost && (
@@ -423,7 +439,7 @@ const ProductDetailPage: React.FC = () => {
               </button>
               
               <Link
-                to={`/orders/new?product=${encodeURIComponent(product.name)}&price=${product.price}&quantity=${quantity}&fromWebsite=true&productId=${product._id}`}
+                to={`/orders/new?product=${encodeURIComponent(product.name)}&price=${product.price}&quantity=${quantity}&fromWebsite=true&productId=${getProductId(product)}`}
                 className="btn-outline w-full btn-lg text-center"
               >
                 Get Custom Quote

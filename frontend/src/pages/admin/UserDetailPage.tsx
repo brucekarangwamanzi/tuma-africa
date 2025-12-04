@@ -18,7 +18,7 @@ import {
   Edit,
   Clock
 } from 'lucide-react';
-import { useUserStore } from '../../store/userStore';
+import { useUserStore, getUserId } from '../../store/userStore';
 import { formatDistanceToNow } from 'date-fns';
 
 const UserDetailPage: React.FC = () => {
@@ -48,24 +48,39 @@ const UserDetailPage: React.FC = () => {
     if (!user) return;
     
     const action = approved ? 'approve' : 'deny';
+    const userId = getUserId(user);
+    if (!userId) {
+      console.error('User ID is missing');
+      return;
+    }
     if (window.confirm(`Are you sure you want to ${action} ${user.fullName}?`)) {
-      await approveUser(user._id, approved);
+      await approveUser(userId, approved);
     }
   };
 
   const handleRoleChange = async (newRole: string) => {
     if (!user) return;
     
+    const userId = getUserId(user);
+    if (!userId) {
+      console.error('User ID is missing');
+      return;
+    }
     if (window.confirm(`Are you sure you want to change ${user.fullName}'s role to ${newRole}?`)) {
-      await updateUserRole(user._id, newRole);
+      await updateUserRole(userId, newRole);
     }
   };
 
   const handleDeactivate = async () => {
     if (!user) return;
     
+    const userId = getUserId(user);
+    if (!userId) {
+      console.error('User ID is missing');
+      return;
+    }
     if (window.confirm(`Are you sure you want to deactivate ${user.fullName}? This action cannot be undone.`)) {
-      await deactivateUser(user._id);
+      await deactivateUser(userId);
       navigate('/admin/users');
     }
   };
@@ -458,7 +473,7 @@ const UserDetailPage: React.FC = () => {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">User ID</span>
-                  <span className="font-mono text-gray-900 text-xs">{user._id}</span>
+                  <span className="font-mono text-gray-900 text-xs">{getUserId(user)}</span>
                 </div>
                 
                 <div className="flex justify-between">
