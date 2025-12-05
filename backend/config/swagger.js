@@ -18,10 +18,6 @@ const options = {
       {
         url: process.env.API_URL || `http://localhost:${process.env.PORT || 5001}/api`,
         description: 'Development server'
-      },
-      {
-        url: process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/api` : 'http://localhost:3000/api',
-        description: 'Production server'
       }
     ],
     components: {

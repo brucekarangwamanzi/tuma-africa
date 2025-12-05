@@ -298,12 +298,18 @@ router.get('/dashboard-stats', authenticateToken, requireApproval, async (req, r
     }));
 
     // Get recent orders
-    const recentOrders = await Order.findAll({
+    const recentOrdersData = await Order.findAll({
       where: { userId: req.user.id },
       attributes: ['id', 'orderId', 'productName', 'status', 'finalAmount', 'createdAt'],
       order: [['createdAt', 'DESC']],
       limit: 5
     });
+
+    // Convert finalAmount to number (Sequelize DECIMAL returns as string)
+    const recentOrders = recentOrdersData.map(order => ({
+      ...order.toJSON(),
+      finalAmount: parseFloat(order.finalAmount) || 0
+    }));
 
     // Get unread messages count
     // Find chats where user is a participant

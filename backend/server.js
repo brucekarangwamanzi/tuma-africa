@@ -8,8 +8,8 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
-// Trust proxy for rate limiting (required when behind reverse proxy)
-app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : 'loopback');
+// Trust proxy for rate limiting
+app.set('trust proxy', 'loopback');
 
 // Security middleware
 app.use(helmet({
@@ -24,31 +24,24 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for public endpoints and notification endpoints in development
-    if (process.env.NODE_ENV !== 'production') {
-      return req.path.includes('/public/') || 
-             req.path.includes('/products') ||
-             req.path.includes('/notifications/unread-count') ||
-             req.path.includes('/orders'); // Allow frequent requests to orders in development
-    }
-    return false;
+    // Skip rate limiting for public endpoints and notification endpoints
+    return req.path.includes('/public/') || 
+           req.path.includes('/products') ||
+           req.path.includes('/notifications/unread-count') ||
+           req.path.includes('/orders');
   }
 });
 app.use('/api/', limiter);
 
 // CORS configuration
-const allowedOrigins = process.env.NODE_ENV === 'production' 
-  ? [
-      process.env.FRONTEND_URL
-    ].filter(Boolean)
-  : [
-      'http://localhost:3000',
-      'http://192.168.43.98:3000',
-      'http://192.168.0.246:3000',
-      /^http:\/\/192\.168\.\d+\.\d+:3000$/, // Allow any local network IP
-      /^http:\/\/10\.\d+\.\d+\.\d+:3000$/, // Allow 10.x.x.x network
-      /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/ // Allow 172.16-31.x.x network
-    ];
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://192.168.43.98:3000',
+  'http://192.168.0.246:3000',
+  /^http:\/\/192\.168\.\d+\.\d+:3000$/, // Allow any local network IP
+  /^http:\/\/10\.\d+\.\d+\.\d+:3000$/, // Allow 10.x.x.x network
+  /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/ // Allow 172.16-31.x.x network
+];
 
 app.use(cors({
   origin: allowedOrigins,
@@ -151,14 +144,6 @@ app.use('/api/upload', require('./routes/upload'));
 app.use('/api/public', require('./routes/public'));
 app.use('/api/notifications', require('./routes/notifications'));
 
-// Serve static assets in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../frontend/build')));
-  
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
-  });
-}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -203,18 +188,14 @@ app.set('io', null); // Will be set after io initialization
 // Socket.IO setup with enhanced configuration
 const io = require('socket.io')(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? [
-          process.env.FRONTEND_URL
-        ].filter(Boolean)
-      : [
-          'http://localhost:3000',
-          'http://192.168.43.98:3000',
-          'http://192.168.0.246:3000',
-          /^http:\/\/192\.168\.\d+\.\d+:3000$/,
-          /^http:\/\/10\.\d+\.\d+\.\d+:3000$/,
-          /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/
-        ],
+    origin: [
+      'http://localhost:3000',
+      'http://192.168.43.98:3000',
+      'http://192.168.0.246:3000',
+      /^http:\/\/192\.168\.\d+\.\d+:3000$/,
+      /^http:\/\/10\.\d+\.\d+\.\d+:3000$/,
+      /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/
+    ],
     credentials: true,
     methods: ['GET', 'POST']
   },

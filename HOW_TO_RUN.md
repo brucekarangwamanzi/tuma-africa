@@ -136,10 +136,9 @@ npm run frontend
 | Command | Description |
 |---------|-------------|
 | `npm run backend` | Start backend with nodemon (auto-restart) |
-| `npm run backend:prod` | Start backend in production mode |
 | `npm run frontend` | Start frontend development server |
-| `npm run build` | Build frontend for production |
-| `npm start` | Start backend in production mode |
+| `npm run build` | Build frontend |
+| `npm start` | Start backend |
 | `npm run install-all` | Install all dependencies (root + frontend) |
 
 ### Frontend Directory (`/home/kmbruce/inn/frontend`):
@@ -147,7 +146,7 @@ npm run frontend
 | Command | Description |
 |---------|-------------|
 | `npm start` | Start frontend development server |
-| `npm run build` | Build for production |
+| `npm run build` | Build frontend |
 | `npm test` | Run tests |
 
 ---

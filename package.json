@@ -4,8 +4,8 @@
   "description": "Full-stack cargo and product ordering system connecting African customers to Asian suppliers",
   "main": "server.js",
   "scripts": {
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
     "backend": "nodemon backend/server.js",
-    "backend:prod": "node backend/server.js",
     "frontend": "cd frontend && npm start",
     "build": "cd frontend && npm run build",
     "start": "node backend/server.js",

@@ -5,13 +5,11 @@ import {
   ArrowLeft, 
   Save, 
   Truck, 
-  MapPin, 
-  Clock, 
   User, 
   DollarSign,
   AlertCircle
 } from 'lucide-react';
-import { useOrderStore, getOrderId } from '../../store/orderStore';
+import { useOrderStore } from '../../store/orderStore';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
@@ -155,7 +153,9 @@ const AdminOrderEditPage: React.FC = () => {
     );
   }
 
-  const finalAmount = currentOrder ? (formData.unitPrice * currentOrder.quantity) + formData.shippingCost : 0;
+  const finalAmount = currentOrder 
+    ? (getPriceNumber(formData.unitPrice) * currentOrder.quantity) + getPriceNumber(formData.shippingCost)
+    : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">

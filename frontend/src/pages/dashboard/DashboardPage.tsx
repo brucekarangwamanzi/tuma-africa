@@ -259,7 +259,7 @@ const DashboardPage: React.FC = () => {
                                   })}
                                 </p>
                                 <p className="text-sm sm:text-base font-bold text-gray-900">
-                                  ${order.finalAmount.toFixed(2)}
+                                  ${(Number(order.finalAmount) || 0).toFixed(2)}
                                 </p>
                               </div>
                             </div>

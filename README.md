@@ -80,8 +80,8 @@ NODE_ENV=development
 MONGODB_URI=mongodb://localhost:27017/tuma-africa-cargo
 
 # JWT
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-this-in-production
+JWT_SECRET=your-super-secret-jwt-key
+JWT_REFRESH_SECRET=your-super-secret-refresh-key
 JWT_EXPIRE=24h
 JWT_REFRESH_EXPIRE=7d
 
@@ -137,19 +137,6 @@ The application will be available at:
 - Backend API: http://localhost:5001
 - WebSocket: ws://localhost:5001
 
-### Production Build
-
-**Build Frontend:**
-```bash
-cd frontend
-npm run build
-```
-
-**Run Production Server:**
-```bash
-cd backend
-NODE_ENV=production npm start
-```
 
 ## 📱 Application Structure
 
@@ -262,30 +249,6 @@ cd frontend
 npm test
 ```
 
-## 📦 Deployment
-
-### Using PM2 (Recommended)
-
-```bash
-# Install PM2
-npm install -g pm2
-
-# Start backend
-cd backend
-pm2 start server.js --name tuma-backend
-
-# Build and serve frontend
-cd ../frontend
-npm run build
-pm2 serve build 3000 --name tuma-frontend --spa
-```
-
-### Using Docker
-
-```bash
-# Build and run with Docker Compose
-docker-compose up -d
-```
 
 ## 🔒 Security Features
 
