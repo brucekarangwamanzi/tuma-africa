@@ -98,52 +98,49 @@ git push origin main
 
 #### Step 2: Deploy on Render
 
-1. Go to https://render.com
-2. Sign up with GitHub
-3. Click "New +" → "Web Service"
-4. Select your repository
-5. Configure:
-   ```
-   Name: tuma-africa-cargo
-   Environment: Node
-   Build Command: cd backend && npm install
-   Start Command: cd backend && node server.js
+### Deploy to Your VPS Server
+
+1. **Setup your server** (Ubuntu/Debian):
+   ```bash
+   # Install Node.js, PostgreSQL, Nginx, PM2
+   sudo apt update
+   sudo apt install -y nodejs npm postgresql nginx
+   sudo npm install -g pm2
    ```
 
-6. Add Environment Variables:
+2. **Clone and setup**:
+   ```bash
+   cd /var/www
+   git clone your-repo-url tuma-africa
+   cd tuma-africa
    ```
-   NODE_ENV=production
-   PORT=5001
-   MONGODB_URI=your_mongodb_connection
-   JWT_SECRET=your_secret_key
+
+3. **Configure environment**:
+   ```bash
+   cd backend
+   # Edit .env file with your production settings
+   nano .env
    ```
 
-7. Click "Create Web Service"
+4. **Build and start**:
+   ```bash
+   # Build frontend
+   cd ../frontend
+   npm install
+   npm run build
+   
+   # Start backend with PM2
+   cd ../backend
+   npm install
+   pm2 start ecosystem.config.js
+   pm2 save
+   ```
 
-#### Step 3: Get Your URL
-```
-https://tuma-africa-cargo.onrender.com
-```
-
-**This URL works from anywhere in the world!**
-
-### B. Railway (Alternative)
-
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login
-railway login
-
-# Deploy
-railway init
-railway up
-```
+5. **Configure Nginx** (see nginx-production.conf)
 
 Your app will be at:
 ```
-https://your-app.railway.app
+http://your-server-ip
 ```
 
 ---

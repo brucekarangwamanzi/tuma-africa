@@ -56,10 +56,9 @@ echo "Select deployment option:"
 echo "1) Deploy to VPS with PM2 (Full Control)"
 echo "2) Build for Production (Local)"
 echo "3) Setup Ngrok (Quick Public URL)"
-echo "4) Deploy to Render (Cloud - Manual)"
-echo "5) Exit"
+echo "4) Exit"
 echo ""
-read -p "Enter your choice (1-5): " choice
+read -p "Enter your choice (1-4): " choice
 
 case $choice in
     1)
@@ -195,29 +194,6 @@ EOF
         ;;
 
     4)
-        echo ""
-        print_info "📋 Render Deployment Instructions"
-        echo ""
-        echo "1. Push your code to GitHub"
-        echo "2. Go to https://render.com and sign up"
-        echo "3. Click 'New +' → 'Web Service'"
-        echo "4. Connect your GitHub repository"
-        echo "5. Configure:"
-        echo "   - Name: tuma-africa-cargo"
-        echo "   - Environment: Node"
-        echo "   - Build Command: cd backend && npm install"
-        echo "   - Start Command: cd backend && node server.js"
-        echo "6. Add Environment Variables:"
-        echo "   - NODE_ENV=production"
-        echo "   - PORT=5001"
-        echo "   - MONGODB_URI=your_mongodb_uri"
-        echo "   - JWT_SECRET=your_secret"
-        echo "7. Click 'Create Web Service'"
-        echo ""
-        print_info "For detailed instructions, see DEPLOYMENT_OPTIONS.md"
-        ;;
-
-    5)
         echo ""
         print_info "Exiting..."
         exit 0

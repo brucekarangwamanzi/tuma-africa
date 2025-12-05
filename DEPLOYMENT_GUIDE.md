@@ -8,149 +8,112 @@ This guide will help you deploy your Tuma Africa Cargo application so anyone can
 
 ## 🎯 Deployment Options
 
-### Option 1: Render (Recommended - FREE)
-- ✅ Free tier available
-- ✅ Easy setup
-- ✅ Automatic HTTPS
-- ✅ Good for production
-
-### Option 2: Railway
-- ✅ Free tier available
-- ✅ Very easy deployment
-- ✅ Great developer experience
-
-### Option 3: Heroku
-- ✅ Popular platform
-- ✅ Easy to use
-- ⚠️ No longer has free tier
-
-### Option 4: DigitalOcean/AWS/Azure
+### Option 1: VPS Server (Recommended)
 - ✅ Full control
 - ✅ Scalable
-- ⚠️ Requires more setup
-- ⚠️ Costs money
+- ✅ Cost-effective
+- ⚠️ Requires setup
+
+### Option 2: Local Network (Testing)
+- ✅ Free
+- ✅ Quick setup
+- ⚠️ Only accessible on same network
 
 ---
 
-## 🌟 OPTION 1: Render (Recommended)
+## 🌟 OPTION 1: VPS Deployment (Recommended)
 
 ### Step 1: Prepare Your Code
 
 #### 1.1 Create Production Environment File
 ```bash
-# Create .env.production in backend folder
-cat > backend/.env.production << 'EOF'
+# Create .env in backend folder
+cd backend
+nano .env
+```
+
+Add:
+```env
 NODE_ENV=production
 PORT=5001
-MONGODB_URI=your_mongodb_atlas_uri_here
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=tuma_africa_cargo
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_password
 JWT_SECRET=your_super_secret_jwt_key_here
-JWT_EXPIRES_IN=7d
-RATE_LIMIT_WINDOW=15
-RATE_LIMIT_MAX=100
-EOF
+JWT_REFRESH_SECRET=your_refresh_secret
+FRONTEND_URL=http://your-server-ip
 ```
 
 #### 1.2 Update package.json Scripts
 Already configured! Your scripts are ready.
 
-### Step 2: Setup MongoDB Atlas (Free Database)
+### Step 2: Setup PostgreSQL Database
 
-1. **Go to**: https://www.mongodb.com/cloud/atlas
-2. **Sign up** for free account
-3. **Create a cluster** (Free M0 tier)
-4. **Create database user**:
-   - Username: `tumaadmin`
-   - Password: (generate strong password)
-5. **Whitelist IP**: Add `0.0.0.0/0` (allow from anywhere)
-6. **Get connection string**:
-   ```
-   mongodb+srv://tumaadmin:<password>@cluster0.xxxxx.mongodb.net/tuma-africa-cargo?retryWrites=true&w=majority
+1. **Install PostgreSQL**:
+   ```bash
+   sudo apt update
+   sudo apt install postgresql postgresql-contrib
    ```
 
-### Step 3: Deploy Backend to Render
-
-1. **Go to**: https://render.com
-2. **Sign up** with GitHub
-3. **Connect your repository**
-4. **Create New Web Service**:
-   - Name: `tuma-africa-backend`
-   - Environment: `Node`
-   - Build Command: `cd backend && npm install`
-   - Start Command: `cd backend && npm start`
-   - Plan: `Free`
-
-5. **Add Environment Variables**:
-   ```
-   NODE_ENV=production
-   PORT=5001
-   MONGODB_URI=mongodb+srv://tumaadmin:password@cluster0.xxxxx.mongodb.net/tuma-africa-cargo
-   JWT_SECRET=your_super_secret_key_change_this_in_production
-   JWT_EXPIRES_IN=7d
+2. **Create database**:
+   ```bash
+   sudo -u postgres psql
+   CREATE DATABASE tuma_africa_cargo;
+   CREATE USER postgres WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE tuma_africa_cargo TO postgres;
+   \q
    ```
 
-6. **Deploy** - Wait 5-10 minutes
-
-7. **Your backend URL**: `https://tuma-africa-backend.onrender.com`
-
-### Step 4: Deploy Frontend to Render
-
-1. **Create New Static Site**:
-   - Name: `tuma-africa-frontend`
-   - Build Command: `cd frontend && npm install && npm run build`
-   - Publish Directory: `frontend/build`
-
-2. **Add Environment Variables**:
-   ```
-   REACT_APP_API_URL=https://tuma-africa-backend.onrender.com/api
-   REACT_APP_WS_URL=https://tuma-africa-backend.onrender.com
+3. **Run migrations**:
+   ```bash
+   cd backend
+   npx sequelize-cli db:migrate
    ```
 
-3. **Deploy** - Wait 5-10 minutes
+### Step 3: Deploy Backend
 
-4. **Your frontend URL**: `https://tuma-africa-frontend.onrender.com`
+1. **Install dependencies**:
+   ```bash
+   cd backend
+   npm install --production
+   ```
 
-### Step 5: Update CORS in Backend
+2. **Start with PM2**:
+   ```bash
+   pm2 start ecosystem.config.js
+   pm2 save
+   pm2 startup
+   ```
 
-Update `backend/server.js`:
-```javascript
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://tuma-africa-frontend.onrender.com'] 
-    : ['http://localhost:3000'],
-  credentials: true
-}));
+### Step 4: Build and Deploy Frontend
+
+1. **Build frontend**:
+   ```bash
+   cd frontend
+   npm install
+   npm run build
+   ```
+
+2. **Configure Nginx** (see `nginx-production.conf`):
+   ```bash
+   sudo cp nginx-production.conf /etc/nginx/sites-available/tuma-africa
+   sudo ln -s /etc/nginx/sites-available/tuma-africa /etc/nginx/sites-enabled/
+   sudo nginx -t
+   sudo systemctl restart nginx
+   ```
+
+### Step 5: Verify Deployment
+
+Your app will be available at:
+```
+http://your-server-ip
 ```
 
 ---
 
-## 🚂 OPTION 2: Railway (Alternative)
-
-### Step 1: Install Railway CLI
-```bash
-npm install -g @railway/cli
-railway login
-```
-
-### Step 2: Deploy Backend
-```bash
-cd backend
-railway init
-railway up
-railway variables set MONGODB_URI="your_mongodb_uri"
-railway variables set JWT_SECRET="your_secret"
-```
-
-### Step 3: Deploy Frontend
-```bash
-cd frontend
-railway init
-railway up
-railway variables set REACT_APP_API_URL="your_backend_url"
-```
-
----
-
-## 🔧 OPTION 3: VPS (DigitalOcean/AWS)
+## 🔧 OPTION 2: VPS (DigitalOcean/AWS/Contabo)
 
 ### Step 1: Create VPS Server
 1. Create Ubuntu 22.04 server
@@ -391,31 +354,14 @@ pm2 monit
 
 ## 💰 Cost Estimate
 
-### Free Option (Render + MongoDB Atlas)
-- Backend: FREE
-- Frontend: FREE
-- Database: FREE
-- Total: **$0/month**
-
-### VPS Option (DigitalOcean)
-- Server: $5-10/month
-- Domain: $10/year
-- Total: **~$6/month**
+### VPS Option (DigitalOcean/Contabo/AWS)
+- Server: $5-20/month
+- Domain: $10/year (optional)
+- Total: **~$6-20/month**
 
 ---
 
 ## 🚀 Quick Deploy Commands
-
-### For Render (Easiest)
-```bash
-# 1. Push to GitHub
-git add .
-git commit -m "Ready for deployment"
-git push origin main
-
-# 2. Go to render.com and connect repo
-# 3. Follow steps above
-```
 
 ### For VPS
 ```bash
@@ -432,10 +378,11 @@ cp -r build/* /var/www/html/tuma-africa/
 ## 📞 Support
 
 If you need help:
-1. Check logs: `pm2 logs` (VPS) or Render dashboard
+1. Check logs: `pm2 logs` (VPS)
 2. Check browser console for errors
 3. Verify environment variables
 4. Test API endpoints individually
+5. Check nginx logs: `sudo tail -f /var/log/nginx/error.log`
 
 ---
 

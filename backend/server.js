@@ -39,15 +39,7 @@ app.use('/api/', limiter);
 // CORS configuration
 const allowedOrigins = process.env.NODE_ENV === 'production' 
   ? [
-      'https://tuma-africa-frontend.onrender.com',
-      'https://tuma-africa-backend.onrender.com',
-      process.env.FRONTEND_URL,
-      'http://213.199.35.46', // Production server IP
-      'https://213.199.35.46', // Production server IP with HTTPS
-      /^https:\/\/.*\.vercel\.app$/, // Allow all Vercel deployments
-      /^https:\/\/.*\.railway\.app$/, // Allow Railway deployments
-      /^https:\/\/.*\.onrender\.com$/, // Allow Render deployments
-      /^http:\/\/213\.199\.35\.46(:[0-9]+)?$/ // Allow production IP with any port
+      process.env.FRONTEND_URL
     ].filter(Boolean)
   : [
       'http://localhost:3000',
@@ -213,10 +205,6 @@ const io = require('socket.io')(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
       ? [
-          'https://tuma-africa-frontend.onrender.com',
-          /^https:\/\/.*\.vercel\.app$/, // Allow all Vercel deployments
-          /^https:\/\/.*\.railway\.app$/, // Allow Railway deployments
-          /^https:\/\/.*\.onrender\.com$/, // Allow Render deployments
           process.env.FRONTEND_URL
         ].filter(Boolean)
       : [

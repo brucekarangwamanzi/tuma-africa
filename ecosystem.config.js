@@ -2,7 +2,7 @@ module.exports = {
   apps: [{
     name: 'tuma-africa-backend',
     script: './backend/server.js',
-    cwd: '/var/www/tuma-africa',
+    cwd: process.env.PROJECT_DIR || '/root/project/tuma-africa',
     instances: 1,
     exec_mode: 'fork',
     env: {

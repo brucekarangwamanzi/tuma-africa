@@ -109,13 +109,9 @@ Now that your code is on GitHub, you can deploy to:
 - Connect GitHub repository
 - Auto-deploy from main branch
 
-### Vercel (Frontend)
-- Import GitHub repository
-- Auto-deploy on push
-
-### Railway
-- Connect GitHub repository
-- Deploy backend and frontend
+### VPS Deployment
+- Deploy to your own server
+- Full control and customization
 
 ### DigitalOcean
 - Use App Platform

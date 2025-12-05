@@ -22,7 +22,8 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-PROJECT_DIR="/var/www/tuma-africa"
+# PROJECT_DIR can be set as environment variable or defaults to /root/project/tuma-africa
+PROJECT_DIR="${PROJECT_DIR:-/root/project/tuma-africa}"
 NGINX_CONFIG="/etc/nginx/sites-available/tuma-africa"
 NGINX_ENABLED="/etc/nginx/sites-enabled/tuma-africa"
 

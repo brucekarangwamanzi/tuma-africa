@@ -10,118 +10,34 @@ This guide provides multiple options to deploy your Tuma Africa Cargo applicatio
 
 | Option | Cost | Difficulty | Best For |
 |--------|------|-----------|----------|
-| **Render** | Free tier available | ⭐ Easy | Quick deployment |
-| **Railway** | Free tier available | ⭐ Easy | Modern deployment |
-| **Vercel + MongoDB Atlas** | Free tier available | ⭐⭐ Medium | Serverless |
-| **DigitalOcean** | $6/month | ⭐⭐⭐ Advanced | Full control |
-| **AWS** | Pay as you go | ⭐⭐⭐⭐ Expert | Enterprise |
+| **VPS (DigitalOcean/AWS/etc)** | $6-20/month | ⭐⭐⭐ Advanced | Full control |
 | **Local Network** | Free | ⭐ Easy | Testing only |
 
 ---
 
-## 🌟 Option 1: Render (RECOMMENDED)
+## 🌟 Option 1: VPS Deployment (RECOMMENDED)
 
-**Best for**: Quick deployment with free tier
+**Best for**: Production deployment with full control
 
-### Step 1: Prepare Your Code
+### Step 1: Setup VPS Server
 
-1. Make sure your code is on GitHub
-2. Update environment variables
+1. Create a VPS instance (DigitalOcean, AWS, Contabo, etc.)
+2. SSH into your server
+3. Install dependencies (Node.js, PostgreSQL, Nginx, PM2)
 
-### Step 2: Deploy Backend
+### Step 2: Deploy Application
 
-1. Go to https://render.com
-2. Sign up with GitHub
-3. Click "New +" → "Web Service"
-4. Connect your repository
-5. Configure:
-   - **Name**: tuma-africa-cargo-backend
-   - **Environment**: Node
-   - **Build Command**: `cd backend && npm install`
-   - **Start Command**: `cd backend && node server.js`
-   - **Plan**: Free
+1. Clone your repository
+2. Configure environment variables
+3. Build frontend
+4. Start backend with PM2
+5. Configure Nginx
 
-6. Add Environment Variables:
-   ```
-   NODE_ENV=production
-   PORT=5001
-   MONGODB_URI=your_mongodb_connection_string
-   JWT_SECRET=your_secret_key
-   ```
-
-7. Click "Create Web Service"
-
-### Step 3: Deploy Frontend
-
-1. Click "New +" → "Static Site"
-2. Connect your repository
-3. Configure:
-   - **Name**: tuma-africa-cargo-frontend
-   - **Build Command**: `cd frontend && npm install && npm run build`
-   - **Publish Directory**: `frontend/build`
-
-4. Add Environment Variables:
-   ```
-   REACT_APP_API_URL=https://your-backend-url.onrender.com/api
-   REACT_APP_WS_URL=https://your-backend-url.onrender.com
-   ```
-
-5. Click "Create Static Site"
-
-### Step 4: Get Your URL
-
-Your app will be available at:
-```
-https://tuma-africa-cargo-frontend.onrender.com
-```
+See `NGINX_SETUP.md` for detailed instructions.
 
 ---
 
-## 🚂 Option 2: Railway
-
-**Best for**: Modern deployment with great DX
-
-### Step 1: Install Railway CLI
-
-```bash
-npm install -g @railway/cli
-railway login
-```
-
-### Step 2: Initialize Project
-
-```bash
-railway init
-railway link
-```
-
-### Step 3: Deploy
-
-```bash
-# Deploy backend
-cd backend
-railway up
-
-# Deploy frontend
-cd ../frontend
-railway up
-```
-
-### Step 4: Add Environment Variables
-
-```bash
-railway variables set MONGODB_URI=your_connection_string
-railway variables set JWT_SECRET=your_secret
-```
-
-Your app will be available at:
-```
-https://your-app.railway.app
-```
-
----
-
-## ☁️ Option 3: DigitalOcean Droplet
+## ☁️ Option 2: DigitalOcean Droplet
 
 **Best for**: Full control and custom domain
 
@@ -462,17 +378,11 @@ certbot certificates
 
 ## 💰 Cost Estimates
 
-### Free Options
-- **Render Free Tier**: $0/month (with limitations)
-- **Railway Free Tier**: $0/month (500 hours)
-- **Vercel**: $0/month (hobby)
-- **MongoDB Atlas**: $0/month (512MB)
-
 ### Paid Options
 - **DigitalOcean Droplet**: $6/month
 - **AWS EC2 t2.micro**: ~$10/month
-- **Render Starter**: $7/month
-- **Railway Pro**: $5/month
+- **Contabo VPS**: ~$5-10/month
+- **PostgreSQL**: Included with VPS or use managed service
 
 ---
 
@@ -480,13 +390,14 @@ certbot certificates
 
 For production deployment, I recommend:
 
-1. **Backend**: Render Web Service ($7/month)
-2. **Frontend**: Vercel (Free)
-3. **Database**: MongoDB Atlas (Free tier)
-4. **Domain**: Namecheap (~$10/year)
-5. **SSL**: Let's Encrypt (Free)
+1. **VPS Server**: DigitalOcean/Contabo ($6-10/month)
+2. **Backend**: Node.js with PM2
+3. **Frontend**: Nginx serving static files
+4. **Database**: PostgreSQL on same server or managed
+5. **Domain**: Namecheap (~$10/year)
+6. **SSL**: Let's Encrypt (Free)
 
-**Total**: ~$8/month + $10/year domain
+**Total**: ~$6-10/month + $10/year domain
 
 ---
 
