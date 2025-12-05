@@ -13,12 +13,12 @@ frontend/build
 backend/dist
 
 # Environment variables
-# .env - REMOVED: Now tracked in git (⚠️ Contains sensitive data!)
+# backend/.env - Tracked in git (⚠️ Contains sensitive data!)
+frontend/.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-# *.env - Commented out to allow backend/.env
 
 # Logs
 npm-debug.log*
