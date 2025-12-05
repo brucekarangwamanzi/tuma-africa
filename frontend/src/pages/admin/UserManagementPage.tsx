@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { 
   Users, 
   Search, 
-  Filter, 
   Check,
   X,
   Eye,
@@ -18,8 +17,7 @@ import {
   Activity,
   AlertCircle,
   CheckCircle,
-  RefreshCw,
-  TrendingUp
+  RefreshCw
 } from 'lucide-react';
 import { useUserStore, getUserId } from '../../store/userStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -42,11 +40,7 @@ const UserManagementPage: React.FC = () => {
   const [approvalFilter, setApprovalFilter] = useState(searchParams.get('approved') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('verified') || '');
 
-  useEffect(() => {
-    loadUsers();
-  }, [searchParams]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     const params = new URLSearchParams();
     
     if (searchQuery) params.set('search', searchQuery);
@@ -57,7 +51,11 @@ const UserManagementPage: React.FC = () => {
     params.set('limit', '20');
 
     await fetchUsers(params);
-  };
+  }, [searchQuery, roleFilter, approvalFilter, statusFilter, searchParams, fetchUsers]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

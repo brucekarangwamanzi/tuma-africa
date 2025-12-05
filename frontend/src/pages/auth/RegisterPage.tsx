@@ -188,7 +188,7 @@ const RegisterPage: React.FC = () => {
                     {...register('phone', {
                       required: 'Phone number is required',
                       pattern: {
-                        value: /^\+?[\d\s\-\(\)]{10,}$/,
+                        value: /^\+?[\d\s\-()]{10,}$/,
                         message: 'Please enter a valid phone number'
                       }
                     })}

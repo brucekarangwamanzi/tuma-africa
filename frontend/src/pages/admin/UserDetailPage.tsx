@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Users, 
@@ -42,7 +42,7 @@ const UserDetailPage: React.FC = () => {
     return () => {
       clearCurrentUser();
     };
-  }, [userId]);
+  }, [userId, clearCurrentUser, fetchUser]);
 
   const handleApproval = async (approved: boolean) => {
     if (!user) return;

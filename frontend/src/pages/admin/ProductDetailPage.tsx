@@ -16,8 +16,7 @@ import {
   DollarSign,
   Activity,
   AlertCircle,
-  CheckCircle,
-  ExternalLink
+  CheckCircle
 } from 'lucide-react';
 import { useProductStore, getProductId } from '../../store/productStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -42,7 +41,7 @@ const ProductDetailPage: React.FC = () => {
     return () => {
       clearCurrentProduct();
     };
-  }, [productId]);
+  }, [productId, clearCurrentProduct, fetchProduct]);
 
   const handleDelete = async () => {
     if (!product) return;

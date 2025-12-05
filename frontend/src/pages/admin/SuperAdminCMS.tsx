@@ -789,8 +789,8 @@ const SuperAdminCMS: React.FC = () => {
                           {/* Navigation Example */}
                           <div className="bg-white rounded-lg p-4 border border-gray-200">
                             <div className="flex space-x-6">
-                              <a 
-                                href="#" 
+                              <button 
+                                type="button"
                                 className="font-medium border-b-2 pb-2"
                                 style={{ 
                                   color: watchedValues.theme?.primaryColor || '#3b82f6',
@@ -798,9 +798,9 @@ const SuperAdminCMS: React.FC = () => {
                                 }}
                               >
                                 Active Tab
-                              </a>
-                              <a href="#" className="font-medium text-gray-500 pb-2">Inactive Tab</a>
-                              <a href="#" className="font-medium text-gray-500 pb-2">Another Tab</a>
+                              </button>
+                              <button type="button" className="font-medium text-gray-500 pb-2">Inactive Tab</button>
+                              <button type="button" className="font-medium text-gray-500 pb-2">Another Tab</button>
                             </div>
                           </div>
 
