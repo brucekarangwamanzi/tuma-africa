@@ -1,15 +1,43 @@
-// Health check endpoint for Render
+// Health check endpoint
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
+const { sequelize } = require('../config/database');
 
-router.get('/health', (req, res) => {
+// Cache database connection status
+let dbStatus = 'checking';
+let lastCheck = 0;
+const CHECK_INTERVAL = 30000; // Check every 30 seconds
+
+// Async function to check database connection
+async function checkDatabase() {
+  const now = Date.now();
+  
+  // Use cached status if checked recently
+  if (now - lastCheck < CHECK_INTERVAL && dbStatus !== 'checking') {
+    return dbStatus;
+  }
+  
+  try {
+    await sequelize.authenticate();
+    dbStatus = 'connected';
+    lastCheck = now;
+    return 'connected';
+  } catch (error) {
+    dbStatus = 'disconnected';
+    lastCheck = now;
+    return 'disconnected';
+  }
+}
+
+router.get('/health', async (req, res) => {
+  const databaseStatus = await checkDatabase();
+  
   const health = {
-    status: 'ok',
+    status: databaseStatus === 'connected' ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    database: databaseStatus,
     memory: {
       used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB',
       total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + ' MB'
