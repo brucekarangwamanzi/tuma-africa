@@ -1,7 +1,7 @@
 // Health check endpoint
 const express = require('express');
 const router = express.Router();
-const { sequelize } = require('../config/database');
+const { sequelize } = require('./config/database');
 
 // Cache database connection status
 let dbStatus = 'checking';
