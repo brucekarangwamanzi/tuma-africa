@@ -54,22 +54,9 @@ const requireRole = (roles) => {
 };
 
 // Check if user is approved (for regular users)
+// NOTE: Approval requirement has been removed - all users are auto-approved on registration
 const requireApproval = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ message: 'Authentication required' });
-  }
-
-  // Super admin and admin don't need approval
-  if (['super_admin', 'admin'].includes(req.user.role)) {
-    return next();
-  }
-
-  if (!req.user.approved) {
-    return res.status(403).json({ 
-      message: 'Account pending approval. Please contact administrator.' 
-    });
-  }
-
+  // Always pass - approval is no longer required
   next();
 };
 

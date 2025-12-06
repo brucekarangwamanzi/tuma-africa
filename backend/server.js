@@ -188,20 +188,30 @@ app.set('io', null); // Will be set after io initialization
 // Socket.IO setup with enhanced configuration
 const io = require('socket.io')(server, {
   cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://192.168.43.98:3000',
-      'http://192.168.0.246:3000',
-      /^http:\/\/192\.168\.\d+\.\d+:3000$/,
-      /^http:\/\/10\.\d+\.\d+\.\d+:3000$/,
-      /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/
-    ],
+    origin: process.env.NODE_ENV === 'production' 
+      ? [
+          'https://tuma-africa-frontend.onrender.com',
+          /^https:\/\/.*\.vercel\.app$/, // Allow all Vercel deployments
+          /^https:\/\/.*\.railway\.app$/, // Allow Railway deployments
+          /^https:\/\/.*\.onrender\.com$/, // Allow Render deployments
+          process.env.FRONTEND_URL
+        ].filter(Boolean)
+      : [
+          'http://localhost:3000',
+          'http://127.0.0.1:3000',
+          'http://192.168.43.98:3000',
+          'http://192.168.0.246:3000',
+          /^http:\/\/192\.168\.\d+\.\d+:3000$/,
+          /^http:\/\/10\.\d+\.\d+\.\d+:3000$/,
+          /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/
+        ],
     credentials: true,
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST', 'OPTIONS']
   },
   transports: ['websocket', 'polling'],
   pingTimeout: 60000,
-  pingInterval: 25000
+  pingInterval: 25000,
+  allowEIO3: true // Allow Engine.IO v3 clients
 });
 
 // Make io accessible to routes

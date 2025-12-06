@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   MessageCircle,
   Search,
@@ -22,8 +23,10 @@ import websocketService from '../../services/websocket';
 import { useAuthStore } from '../../store/authStore';
 
 interface Chat {
-  _id: string;
+  id?: string; // PostgreSQL UUID
+  _id: string; // MongoDB ObjectId (for backward compatibility)
   participants: Array<{
+    id?: string;
     _id: string;
     fullName: string;
     email: string;
@@ -34,12 +37,14 @@ interface Chat {
   status: string;
   priority: string;
   orderId?: {
+    id?: string;
     _id: string;
     orderId: string;
     productName: string;
     status: string;
   };
   messages?: Array<{
+    id?: string;
     _id: string;
     sender: string;
     type: string;
@@ -53,6 +58,7 @@ interface Chat {
 
 const ChatManagementPage: React.FC = () => {
   const { user } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -112,15 +118,31 @@ const ChatManagementPage: React.FC = () => {
       if (statusFilter) params.set('status', statusFilter);
       
       const response = await axios.get(`/chat/admin/all?${params.toString()}`);
-      setChats(response.data.chats || []);
+      const fetchedChats = response.data.chats || [];
+      setChats(fetchedChats);
       
       // Calculate stats
-      const total = response.data.chats?.length || 0;
-      const open = response.data.chats?.filter((c: Chat) => c.status === 'open').length || 0;
-      const closed = response.data.chats?.filter((c: Chat) => c.status === 'closed').length || 0;
-      const pending = response.data.chats?.filter((c: Chat) => c.status === 'pending').length || 0;
+      const total = fetchedChats.length || 0;
+      const open = fetchedChats.filter((c: Chat) => c.status === 'open').length || 0;
+      const closed = fetchedChats.filter((c: Chat) => c.status === 'closed').length || 0;
+      const pending = fetchedChats.filter((c: Chat) => c.status === 'pending').length || 0;
       
       setStats({ total, open, closed, pending });
+
+      // Auto-select chat if chatId is in URL params
+      const chatIdFromUrl = searchParams.get('chatId');
+      if (chatIdFromUrl && !selectedChat) {
+        const chatToSelect = fetchedChats.find((c: Chat) => 
+          c._id === chatIdFromUrl || c.id === chatIdFromUrl
+        );
+        if (chatToSelect) {
+          setSelectedChat(chatToSelect);
+          fetchChatMessages(chatToSelect._id || chatToSelect.id);
+          // Remove chatId from URL after selecting
+          searchParams.delete('chatId');
+          setSearchParams(searchParams, { replace: true });
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch chats:', error);
       toast.error('Failed to load chats');
@@ -132,11 +154,14 @@ const ChatManagementPage: React.FC = () => {
   const fetchChatMessages = async (chatId: string) => {
     try {
       const response = await axios.get(`/chat/messages?chatId=${chatId}`);
-      if (response.data.messages && selectedChat && selectedChat._id === chatId) {
-        setSelectedChat({
-          ...selectedChat,
-          messages: response.data.messages
-        });
+      if (response.data.messages && selectedChat) {
+        const currentChatId = selectedChat._id || selectedChat.id;
+        if (currentChatId === chatId) {
+          setSelectedChat({
+            ...selectedChat,
+            messages: response.data.messages
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch messages:', error);

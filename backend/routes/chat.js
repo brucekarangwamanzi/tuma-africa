@@ -1232,4 +1232,121 @@ router.get('/admin/sessions', authenticateToken, requireRole(['admin', 'super_ad
   }
 });
 
+// @route   POST /api/chat/admin/create-with-user
+// @desc    Create or get existing chat with a specific user (Admin/Super Admin only)
+// @access  Private (Admin/Super Admin)
+router.post('/admin/create-with-user', authenticateToken, requireRole(['admin', 'super_admin']), async (req, res) => {
+  try {
+    const { userId, orderId, title } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    // Find the user
+    const targetUser = await User.findByPk(userId, {
+      attributes: ['id', 'fullName', 'email', 'role']
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if chat already exists with this user
+    const existingChats = await Chat.findAll({
+      where: {
+        chatType: 'support',
+        ...(orderId && { orderId })
+      },
+      include: [{
+        model: User,
+        as: 'participants',
+        where: { id: userId },
+        attributes: ['id'],
+        through: { attributes: [] }
+      }]
+    });
+
+    let chat;
+    if (existingChats.length > 0) {
+      // Use existing chat
+      chat = existingChats[0];
+      await chat.reload({
+        include: [
+          {
+            model: User,
+            as: 'participants',
+            attributes: ['id', 'fullName', 'email', 'role'],
+            through: { attributes: [] }
+          },
+          {
+            model: Order,
+            as: 'order',
+            attributes: ['id', 'orderId', 'productName', 'status'],
+            required: false
+          }
+        ]
+      });
+    } else {
+      // Create new chat
+      const chatTitle = title || `Support Chat - ${targetUser.fullName}`;
+      
+      chat = await Chat.create({
+        chatType: 'support',
+        title: chatTitle,
+        status: 'open',
+        priority: 'medium',
+        orderId: orderId || null
+      });
+
+      // Add participants
+      await chat.addParticipants([userId, req.user.id]);
+
+      // Reload with participants
+      await chat.reload({
+        include: [
+          {
+            model: User,
+            as: 'participants',
+            attributes: ['id', 'fullName', 'email', 'role'],
+            through: { attributes: [] }
+          },
+          {
+            model: Order,
+            as: 'order',
+            attributes: ['id', 'orderId', 'productName', 'status'],
+            required: false
+          }
+        ]
+      });
+
+      console.log(`✅ Created new chat ${chat.id} between admin ${req.user.id} and user ${userId}`);
+    }
+
+    res.json({
+      message: 'Chat retrieved successfully',
+      chat: {
+        id: chat.id,
+        _id: chat.id, // For backward compatibility
+        title: chat.title,
+        chatType: chat.chatType,
+        status: chat.status,
+        priority: chat.priority,
+        participants: chat.participants,
+        orderId: chat.orderId,
+        order: chat.order,
+        createdAt: chat.createdAt,
+        updatedAt: chat.updatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Create chat with user error:', error);
+    res.status(500).json({ 
+      message: 'Failed to create chat',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 module.exports = router;

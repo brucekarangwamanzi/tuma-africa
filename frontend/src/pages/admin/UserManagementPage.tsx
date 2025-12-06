@@ -29,7 +29,6 @@ const UserManagementPage: React.FC = () => {
     pagination,
     isLoading,
     fetchUsers,
-    approveUser,
     updateUserRole,
     deactivateUser
   } = useUserStore();
@@ -80,12 +79,7 @@ const UserManagementPage: React.FC = () => {
     setSearchParams(params);
   };
 
-  const handleApproval = async (userId: string, approved: boolean, userName: string) => {
-    const action = approved ? 'approve' : 'deny';
-    if (window.confirm(`Are you sure you want to ${action} ${userName}?`)) {
-      await approveUser(userId, approved);
-    }
-  };
+  // Approval functionality removed - users are auto-approved on registration
 
   const handleRoleChange = async (userId: string, newRole: string, userName: string) => {
     if (window.confirm(`Are you sure you want to change ${userName}'s role to ${newRole}?`)) {
@@ -126,15 +120,7 @@ const UserManagementPage: React.FC = () => {
       );
     }
     
-    if (!approved) {
-      return (
-        <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-          <Clock className="w-3 h-3" />
-          <span>Pending Approval</span>
-        </span>
-      );
-    }
-    
+    // Approval is no longer required - all users are auto-approved
     if (!verified) {
       return (
         <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
@@ -176,7 +162,7 @@ const UserManagementPage: React.FC = () => {
               <div>
                 <h1 className="text-4xl font-bold text-gray-900">User Management</h1>
                 <p className="mt-2 text-lg text-gray-600">
-                  Manage user registrations, approvals, and permissions
+                  Manage user registrations and permissions
                 </p>
               </div>
             </div>
@@ -204,30 +190,6 @@ const UserManagementPage: React.FC = () => {
                 </div>
                 <div className="p-3 bg-blue-100 rounded-full">
                   <Users className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Approved</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
-                </div>
-                <div className="p-3 bg-green-100 rounded-full">
-                  <UserCheck className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-                </div>
-                <div className="p-3 bg-yellow-100 rounded-full">
-                  <Clock className="w-6 h-6 text-yellow-600" />
                 </div>
               </div>
             </div>
@@ -290,22 +252,6 @@ const UserManagementPage: React.FC = () => {
                     <option value="user">User</option>
                     <option value="admin">Admin</option>
                     <option value="super_admin">Super Admin</option>
-                  </select>
-                </div>
-                
-                <div className="flex items-center space-x-2 bg-gray-50 rounded-xl px-3 py-3 border border-gray-300">
-                  <UserCheck className="w-4 h-4 text-gray-500" />
-                  <select
-                    value={approvalFilter}
-                    onChange={(e) => {
-                      setApprovalFilter(e.target.value);
-                      handleFilterChange('approved', e.target.value);
-                    }}
-                    className="border-none focus:ring-0 focus:outline-none bg-transparent text-sm font-medium"
-                  >
-                    <option value="">All Status</option>
-                    <option value="true">Approved</option>
-                    <option value="false">Pending</option>
                   </select>
                 </div>
                 
@@ -452,26 +398,7 @@ const UserManagementPage: React.FC = () => {
                     </div>
                     
                     <div className="mt-6 xl:mt-0 xl:ml-8 flex flex-col sm:flex-row xl:flex-col gap-3">
-                      {!user.approved && user.isActive && (
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleApproval(userId, true, user.fullName)}
-                            className="flex-1 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                          >
-                            <Check className="w-4 h-4 mr-1" />
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleApproval(userId, false, user.fullName)}
-                            className="flex-1 flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            Deny
-                          </button>
-                        </div>
-                      )}
-                      
-                      {user.approved && user.isActive && (
+                      {user.isActive && (
                         <div className="flex space-x-2">
                           <select
                             value={user.role}

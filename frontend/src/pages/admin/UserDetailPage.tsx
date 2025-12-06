@@ -28,7 +28,6 @@ const UserDetailPage: React.FC = () => {
     currentUser: user, 
     isLoading, 
     fetchUser, 
-    approveUser, 
     updateUserRole, 
     deactivateUser,
     clearCurrentUser 
@@ -44,19 +43,7 @@ const UserDetailPage: React.FC = () => {
     };
   }, [userId, clearCurrentUser, fetchUser]);
 
-  const handleApproval = async (approved: boolean) => {
-    if (!user) return;
-    
-    const action = approved ? 'approve' : 'deny';
-    const userId = getUserId(user);
-    if (!userId) {
-      console.error('User ID is missing');
-      return;
-    }
-    if (window.confirm(`Are you sure you want to ${action} ${user.fullName}?`)) {
-      await approveUser(userId, approved);
-    }
-  };
+  // Approval functionality removed - users are auto-approved on registration
 
   const handleRoleChange = async (newRole: string) => {
     if (!user) return;
@@ -112,15 +99,7 @@ const UserDetailPage: React.FC = () => {
       );
     }
     
-    if (!approved) {
-      return (
-        <span className="inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-          <Clock className="w-4 h-4" />
-          <span>Pending Approval</span>
-        </span>
-      );
-    }
-    
+    // Approval is no longer required - all users are auto-approved
     if (!verified) {
       return (
         <span className="inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
@@ -347,27 +326,7 @@ const UserDetailPage: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
               
               <div className="space-y-3">
-                {!user.approved && user.isActive && (
-                  <>
-                    <button
-                      onClick={() => handleApproval(true)}
-                      className="w-full flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
-                    >
-                      <Check className="w-4 h-4 mr-2" />
-                      Approve User
-                    </button>
-                    
-                    <button
-                      onClick={() => handleApproval(false)}
-                      className="w-full flex items-center justify-center px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Deny User
-                    </button>
-                  </>
-                )}
-                
-                {user.approved && user.isActive && (
+                {user.isActive && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Change Role

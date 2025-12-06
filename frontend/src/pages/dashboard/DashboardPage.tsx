@@ -20,14 +20,14 @@ interface DashboardStats {
   orderStats: Array<{
     _id: string;
     count: number;
-    totalValue: number;
+    totalValue: number | string; // PostgreSQL returns DECIMAL as string
   }>;
   recentOrders: Array<{
     _id: string;
     orderId: string;
     productName: string;
     status: string;
-    finalAmount: number;
+    finalAmount: number | string; // PostgreSQL returns DECIMAL as string
     createdAt: string;
   }>;
   unreadMessages: number;
@@ -40,6 +40,31 @@ interface DashboardStats {
     approved: boolean;
   };
 }
+
+// Helper function to convert string/number to number and format
+const getPriceNumber = (value: number | string | undefined | null): number => {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'number') {
+    return isNaN(value) ? 0 : value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return 0;
+    const parsed = parseFloat(trimmed);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+};
+
+const formatPrice = (value: number | string | undefined | null): string => {
+  try {
+    const num = getPriceNumber(value);
+    return num.toFixed(2);
+  } catch (error) {
+    console.error('Error formatting price:', error, value);
+    return '0.00';
+  }
+};
 
 const DashboardPage: React.FC = () => {
   const { user } = useAuthStore();
@@ -79,7 +104,7 @@ const DashboardPage: React.FC = () => {
   };
 
   const getTotalOrderValue = () => {
-    return stats?.orderStats.reduce((total, stat) => total + stat.totalValue, 0) || 0;
+    return stats?.orderStats.reduce((total, stat) => total + getPriceNumber(stat.totalValue), 0) || 0;
   };
 
   if (isLoading) {
@@ -259,7 +284,7 @@ const DashboardPage: React.FC = () => {
                                   })}
                                 </p>
                                 <p className="text-sm sm:text-base font-bold text-gray-900">
-                                  ${(Number(order.finalAmount) || 0).toFixed(2)}
+                                  ${formatPrice(order.finalAmount)}
                                 </p>
                               </div>
                             </div>

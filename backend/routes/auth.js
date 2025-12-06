@@ -142,7 +142,7 @@ router.post('/register', validateUserRegistration, async (req, res) => {
       currency: currency || 'USD', // Default to USD if not provided
       role: 'user',
       verified: false,
-      approved: false
+      approved: true // Auto-approve new users
     });
 
     // Generate email verification token
