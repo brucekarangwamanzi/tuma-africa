@@ -107,3 +107,4 @@ TROUBLESHOOTING.md
 
 # Deployment secrets
 secrets.txt
+.env.backup
