@@ -1,0 +1,29 @@
+{
+  "short_name": "Tuma-Africa Cargo",
+  "name": "Tuma-Africa Link Cargo - Connect Africa to Asia",
+  "description": "Professional cargo and product ordering services connecting African customers with Asian suppliers",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "logo192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#3b82f6",
+  "background_color": "#ffffff",
+  "categories": ["business", "logistics", "e-commerce"],
+  "lang": "en",
+  "orientation": "portrait-primary"
+}

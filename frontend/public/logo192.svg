@@ -1,0 +1,26 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" rx="24" fill="#3b82f6"/>
+  <rect x="24" y="24" width="144" height="144" rx="12" fill="white"/>
+  
+  <!-- Cargo container icon -->
+  <rect x="48" y="48" width="96" height="48" rx="4" fill="#3b82f6"/>
+  <rect x="52" y="52" width="88" height="40" rx="2" fill="white"/>
+  
+  <!-- Container details -->
+  <rect x="60" y="60" width="24" height="8" rx="1" fill="#3b82f6"/>
+  <rect x="60" y="72" width="16" height="4" rx="1" fill="#94a3b8"/>
+  <rect x="60" y="80" width="20" height="4" rx="1" fill="#94a3b8"/>
+  
+  <rect x="100" y="60" width="24" height="8" rx="1" fill="#3b82f6"/>
+  <rect x="100" y="72" width="16" height="4" rx="1" fill="#94a3b8"/>
+  <rect x="100" y="80" width="20" height="4" rx="1" fill="#94a3b8"/>
+  
+  <!-- Connecting lines (representing Africa to Asia connection) -->
+  <path d="M48 120 Q96 108 144 120" stroke="#3b82f6" stroke-width="3" fill="none"/>
+  <circle cx="48" cy="120" r="6" fill="#ef4444"/>
+  <circle cx="144" cy="120" r="6" fill="#22c55e"/>
+  
+  <!-- Text -->
+  <text x="96" y="150" text-anchor="middle" fill="#3b82f6" font-family="Arial, sans-serif" font-size="16" font-weight="bold">TUMA</text>
+  <text x="96" y="168" text-anchor="middle" fill="#64748b" font-family="Arial, sans-serif" font-size="12">AFRICA CARGO</text>
+</svg>

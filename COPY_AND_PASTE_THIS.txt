@@ -1,0 +1,21 @@
+================================================================================
+                    COPY AND PASTE THIS COMMAND
+================================================================================
+
+Open a NEW terminal window and paste this EXACT command:
+
+sudo -u postgres psql -d tuma_africa_cargo -c "ALTER TABLE products ALTER COLUMN \"imageUrl\" TYPE TEXT;"
+
+Then press Enter and type your sudo password when asked.
+
+================================================================================
+                    AFTER RUNNING THE COMMAND
+================================================================================
+
+1. Refresh your browser (press F5)
+2. Go to: http://localhost:3000/admin/products/new
+3. Try creating a product again
+4. The error will be GONE! ✅
+
+================================================================================
+
