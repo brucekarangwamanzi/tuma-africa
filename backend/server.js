@@ -33,15 +33,28 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS configuration
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://192.168.43.98:3000',
-  'http://192.168.0.246:3000',
-  /^http:\/\/192\.168\.\d+\.\d+:3000$/, // Allow any local network IP
-  /^http:\/\/10\.\d+\.\d+\.\d+:3000$/, // Allow 10.x.x.x network
-  /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/ // Allow 172.16-31.x.x network
-];
+// CORS configuration - environment-aware
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? [
+      'http://tuma-africalinkcargo.com',
+      'https://tuma-africalinkcargo.com',
+      'http://www.tuma-africalinkcargo.com',
+      'https://www.tuma-africalinkcargo.com',
+      'https://tuma-africa-frontend.onrender.com',
+      /^https:\/\/.*\.vercel\.app$/, // Allow all Vercel deployments
+      /^https:\/\/.*\.railway\.app$/, // Allow Railway deployments
+      /^https:\/\/.*\.onrender\.com$/, // Allow Render deployments
+      process.env.FRONTEND_URL
+    ].filter(Boolean)
+  : [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://192.168.43.98:3000',
+      'http://192.168.0.246:3000',
+      /^http:\/\/192\.168\.\d+\.\d+:3000$/, // Allow any local network IP
+      /^http:\/\/10\.\d+\.\d+\.\d+:3000$/, // Allow 10.x.x.x network
+      /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/ // Allow 172.16-31.x.x network
+    ];
 
 app.use(cors({
   origin: allowedOrigins,
