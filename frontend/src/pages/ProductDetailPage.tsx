@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Star, Eye, ShoppingBag, Heart, Share2, ExternalLink, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Star, Eye, ShoppingBag, Heart, Share2, ExternalLink, Plus, Minus, Package } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { useAuthStore } from '../store/authStore';
+import { useOrderStore } from '../store/orderStore';
 
 interface Product {
   id?: string; // UUID from PostgreSQL
@@ -52,6 +53,8 @@ interface Product {
     };
     cost?: number;
     freeShippingThreshold?: number;
+    shippingPriceIncluded?: boolean;
+    taxIncluded?: boolean;
   };
   popularity: {
     views: number;
@@ -114,11 +117,13 @@ const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { createOrder, isSubmitting } = useOrderStore();
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [displayCurrency, setDisplayCurrency] = useState<string>('RWF'); // Default to RWF like home page
+  const [isQuickOrdering, setIsQuickOrdering] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -193,6 +198,60 @@ const ProductDetailPage: React.FC = () => {
     });
 
     navigate(`/orders/new?${orderParams.toString()}`);
+  };
+
+  const handleQuickOrder = async () => {
+    if (!user) {
+      toast.info('Please login to place an order');
+      navigate('/login');
+      return;
+    }
+
+    if (!user.approved) {
+      toast.warning('Your account is pending approval. Please contact support.');
+      return;
+    }
+
+    if (!product) {
+      toast.error('Product information is missing');
+      return;
+    }
+
+    if (!product.stock.available) {
+      toast.error('This product is currently out of stock');
+      return;
+    }
+
+    if (quantity < (product.stock.minOrderQuantity || 1)) {
+      toast.error(`Minimum order quantity is ${product.stock.minOrderQuantity || 1}`);
+      return;
+    }
+
+    setIsQuickOrdering(true);
+    try {
+      const orderData = {
+        productName: product.name,
+        productLink: '', // Empty for website products
+        productImage: product.imageUrl || '',
+        quantity: quantity,
+        unitPrice: getPriceNumber(product.price),
+        freightType: 'sea' as 'sea' | 'air',
+        description: `Quick order for ${product.name} from website`
+      };
+
+      await createOrder(orderData);
+      toast.success(`Order placed successfully! Your order will be processed by our team.`, {
+        autoClose: 5000
+      });
+      
+      // Optionally refresh product to update order count
+      // fetchProduct();
+    } catch (error: any) {
+      console.error('Quick order error:', error);
+      // Error is already handled in createOrder, but we can add additional handling here if needed
+    } finally {
+      setIsQuickOrdering(false);
+    }
   };
 
   const handleShare = async () => {
@@ -410,6 +469,68 @@ const ProductDetailPage: React.FC = () => {
               )}
             </div>
 
+            {/* Shipping & Tax Information */}
+            {(product.shipping?.shippingPriceIncluded !== undefined || 
+              product.shipping?.taxIncluded !== undefined || 
+              (product.shipping?.estimatedDays && 
+               (product.shipping.estimatedDays.min > 0 || product.shipping.estimatedDays.max > 0))) && (
+              <div className="bg-blue-50 rounded-xl p-6 space-y-4 border border-blue-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <Package className="w-5 h-5 mr-2 text-blue-600" />
+                  Shipping & Tax Information
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {product.shipping?.shippingPriceIncluded !== undefined && (
+                    <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-blue-100">
+                      <span className="text-sm font-medium text-gray-700">Shipping Price:</span>
+                      <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
+                        product.shipping.shippingPriceIncluded
+                          ? 'text-green-700 bg-green-100'
+                          : 'text-orange-700 bg-orange-100'
+                      }`}>
+                        {product.shipping.shippingPriceIncluded ? '✓ Included' : 'Not Included'}
+                      </span>
+                    </div>
+                  )}
+
+                  {product.shipping?.taxIncluded !== undefined && (
+                    <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-blue-100">
+                      <span className="text-sm font-medium text-gray-700">Tax:</span>
+                      <span className={`text-sm font-semibold px-3 py-1 rounded-full ${
+                        product.shipping.taxIncluded
+                          ? 'text-green-700 bg-green-100'
+                          : 'text-orange-700 bg-orange-100'
+                      }`}>
+                        {product.shipping.taxIncluded ? '✓ Included' : 'Not Included'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {product.shipping?.estimatedDays && 
+                 (product.shipping.estimatedDays.min > 0 || product.shipping.estimatedDays.max > 0) && (
+                  <div className="bg-white rounded-lg p-4 border border-blue-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Estimated Delivery:</span>
+                      <span className="text-sm font-semibold text-blue-700">
+                        {product.shipping.estimatedDays.min === product.shipping.estimatedDays.max
+                          ? `${product.shipping.estimatedDays.min} ${product.shipping.estimatedDays.min === 1 ? 'day' : 'days'}`
+                          : product.shipping.estimatedDays.min > 0 && product.shipping.estimatedDays.max > 0
+                          ? `${product.shipping.estimatedDays.min} - ${product.shipping.estimatedDays.max} days`
+                          : product.shipping.estimatedDays.min > 0
+                          ? `${product.shipping.estimatedDays.min}+ days`
+                          : `${product.shipping.estimatedDays.max} days`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Delivery time may vary based on location and shipping method
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Stock & Quantity */}
             <div className="bg-gray-50 rounded-xl p-6 space-y-5 border border-gray-200">
               <div className="flex items-center justify-between">
@@ -499,20 +620,30 @@ const ProductDetailPage: React.FC = () => {
             {/* Action Buttons */}
             <div className="space-y-3">
               <button
-                onClick={handleOrderNow}
-                disabled={!product.stock.available}
-                className="btn-primary w-full btn-lg flex items-center justify-center"
+                onClick={handleQuickOrder}
+                disabled={!product.stock.available || isQuickOrdering || isSubmitting}
+                className="btn-primary w-full btn-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <ShoppingBag className="h-5 w-5 mr-2" />
-                Order Now
+                {isQuickOrdering || isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Placing Order...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="h-5 w-5 mr-2" />
+                    Quick Order
+                  </>
+                )}
               </button>
               
-              <Link
-                to={`/orders/new?product=${encodeURIComponent(product.name)}&price=${product.price}&quantity=${quantity}&fromWebsite=true&productId=${getProductId(product)}`}
-                className="btn-outline w-full btn-lg text-center"
+              <button
+                onClick={handleOrderNow}
+                disabled={!product.stock.available}
+                className="btn-outline w-full btn-lg flex items-center justify-center"
               >
-                Get Custom Quote
-              </Link>
+                Customize Order
+              </button>
             </div>
 
             {/* Supplier Info */}
@@ -566,57 +697,6 @@ const ProductDetailPage: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Specifications */}
-          <div className="bg-white rounded-lg shadow-soft p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Specifications</h2>
-            <div className="space-y-3">
-              {product.specifications.brand && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Brand:</span>
-                  <span className="font-medium">{product.specifications.brand}</span>
-                </div>
-              )}
-              {product.specifications.model && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Model:</span>
-                  <span className="font-medium">{product.specifications.model}</span>
-                </div>
-              )}
-              {product.specifications.material && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Material:</span>
-                  <span className="font-medium">{product.specifications.material}</span>
-                </div>
-              )}
-              {product.specifications.weight && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Weight:</span>
-                  <span className="font-medium">{product.specifications.weight}</span>
-                </div>
-              )}
-              {product.specifications.color && product.specifications.color.length > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Colors:</span>
-                  <span className="font-medium">{product.specifications.color.join(', ')}</span>
-                </div>
-              )}
-              {product.specifications.size && product.specifications.size.length > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Sizes:</span>
-                  <span className="font-medium">{product.specifications.size.join(', ')}</span>
-                </div>
-              )}
-              {product.specifications.dimensions && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Dimensions:</span>
-                  <span className="font-medium">
-                    {product.specifications.dimensions.length} × {product.specifications.dimensions.width} × {product.specifications.dimensions.height} {product.specifications.dimensions.unit}
-                  </span>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>

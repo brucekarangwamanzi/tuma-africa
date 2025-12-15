@@ -19,6 +19,7 @@ import {
   Clock
 } from 'lucide-react';
 import { useUserStore, getUserId } from '../../store/userStore';
+import { useAuthStore } from '../../store/authStore';
 import { formatDistanceToNow } from 'date-fns';
 
 const UserDetailPage: React.FC = () => {
@@ -32,6 +33,9 @@ const UserDetailPage: React.FC = () => {
     deactivateUser,
     clearCurrentUser 
   } = useUserStore();
+  
+  const { user: currentUser } = useAuthStore();
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   useEffect(() => {
     if (userId) {
@@ -326,7 +330,7 @@ const UserDetailPage: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
               
               <div className="space-y-3">
-                {user.isActive && (
+                {user.isActive && isSuperAdmin && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Change Role
@@ -340,6 +344,16 @@ const UserDetailPage: React.FC = () => {
                       <option value="admin">Admin</option>
                       <option value="super_admin">Super Admin</option>
                     </select>
+                  </div>
+                )}
+                {user.isActive && !isSuperAdmin && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Role
+                    </label>
+                    <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
+                      {user.role === 'super_admin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : 'User'}
+                    </div>
                   </div>
                 )}
                 

@@ -36,11 +36,14 @@ app.use('/api/', limiter);
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:3002',
   'http://192.168.43.98:3000',
+  'http://192.168.43.98:3002',
   'http://192.168.0.246:3000',
-  /^http:\/\/192\.168\.\d+\.\d+:3000$/, // Allow any local network IP
-  /^http:\/\/10\.\d+\.\d+\.\d+:3000$/, // Allow 10.x.x.x network
-  /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:3000$/ // Allow 172.16-31.x.x network
+  'http://192.168.0.246:3002',
+  /^http:\/\/192\.168\.\d+\.\d+:(3000|3002)$/, // Allow any local network IP on ports 3000 or 3002
+  /^http:\/\/10\.\d+\.\d+\.\d+:(3000|3002)$/, // Allow 10.x.x.x network on ports 3000 or 3002
+  /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:(3000|3002)$/ // Allow 172.16-31.x.x network on ports 3000 or 3002
 ];
 
 app.use(cors({

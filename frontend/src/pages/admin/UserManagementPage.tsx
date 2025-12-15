@@ -20,6 +20,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useUserStore, getUserId } from '../../store/userStore';
+import { useAuthStore } from '../../store/authStore';
 import { formatDistanceToNow } from 'date-fns';
 
 const UserManagementPage: React.FC = () => {
@@ -32,6 +33,9 @@ const UserManagementPage: React.FC = () => {
     updateUserRole,
     deactivateUser
   } = useUserStore();
+  
+  const { user: currentUser } = useAuthStore();
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
@@ -398,7 +402,7 @@ const UserManagementPage: React.FC = () => {
                     </div>
                     
                     <div className="mt-6 xl:mt-0 xl:ml-8 flex flex-col sm:flex-row xl:flex-col gap-3">
-                      {user.isActive && (
+                      {user.isActive && isSuperAdmin && (
                         <div className="flex space-x-2">
                           <select
                             value={user.role}
@@ -409,6 +413,11 @@ const UserManagementPage: React.FC = () => {
                             <option value="admin">Admin</option>
                             <option value="super_admin">Super Admin</option>
                           </select>
+                        </div>
+                      )}
+                      {user.isActive && !isSuperAdmin && (
+                        <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-600">
+                          Role: {user.role === 'super_admin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : 'User'}
                         </div>
                       )}
                       

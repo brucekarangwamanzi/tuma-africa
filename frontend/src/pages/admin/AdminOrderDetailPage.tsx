@@ -384,6 +384,85 @@ const AdminOrderDetailPage: React.FC = () => {
                       </div>
                     )}
 
+                    {isUserObject && userData.address && (
+                      <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <MapPin className="w-5 h-5 text-gray-500 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">Address</p>
+                          <p className="font-medium text-gray-900">
+                            {[
+                              userData.address.street,
+                              userData.address.city,
+                              userData.address.state,
+                              userData.address.country,
+                              userData.address.postalCode
+                            ].filter(Boolean).join(', ') || 'Not provided'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {isUserObject && userData.role && (
+                      <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <User className="w-5 h-5 text-gray-500" />
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">Account Type</p>
+                          <p className="font-medium text-gray-900 capitalize">{userData.role}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {isUserObject && (userData.approved !== undefined || userData.isActive !== undefined) && (
+                      <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <CheckCircle className="w-5 h-5 text-gray-500" />
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">Account Status</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            {userData.approved ? (
+                              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
+                                Approved
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded">
+                                Pending Approval
+                              </span>
+                            )}
+                            {userData.isActive ? (
+                              <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded">
+                                Inactive
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {isUserObject && userData.createdAt && (
+                      <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <Calendar className="w-5 h-5 text-gray-500" />
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">Member Since</p>
+                          <p className="font-medium text-gray-900">
+                            {formatDistanceToNow(new Date(userData.createdAt), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* View Full Profile Link */}
+                    {isUserObject && userData.id && (
+                      <Link
+                        to={`/admin/users/${userData.id}`}
+                        className="block w-full text-center px-4 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors font-medium text-sm"
+                      >
+                        View Full Profile
+                      </Link>
+                    )}
+
                     {/* Start Conversation Button */}
                     <button
                       onClick={handleStartConversation}

@@ -11,10 +11,15 @@ import {
   AlertCircle,
   CheckCircle,
   Link as LinkIcon,
-  FileText
+  FileText,
+  Upload,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import { useOrderStore } from '../store/orderStore';
+import { useAuthStore } from '../store/authStore';
 
 interface OrderFormData {
   productName: string;
@@ -23,20 +28,26 @@ interface OrderFormData {
   unitPrice: number;
   freightType: 'sea' | 'air';
   description: string;
+  productImage?: string;
 }
 
 const NewOrderPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { createOrder, isSubmitting } = useOrderStore();
+  const { accessToken } = useAuthStore();
   const [formData, setFormData] = useState<OrderFormData>({
     productName: searchParams.get('product') || '',
     productLink: searchParams.get('link') || '',
     quantity: parseInt(searchParams.get('quantity') || '1') || 1,
     unitPrice: parseFloat(searchParams.get('price') || '0') || 0,
     freightType: 'sea',
-    description: ''
+    description: '',
+    productImage: ''
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [productInputType, setProductInputType] = useState<'link' | 'image'>('link');
 
   const isFromWebsite = searchParams.get('fromWebsite') === 'true';
   const productId = searchParams.get('productId');
@@ -75,10 +86,29 @@ const NewOrderPage: React.FC = () => {
     const fromWebsite = searchParams.get('fromWebsite') === 'true';
 
     if (product) setFormData(prev => ({ ...prev, productName: product }));
-    if (link && !fromWebsite) setFormData(prev => ({ ...prev, productLink: link }));
+    if (link && !fromWebsite) {
+      setFormData(prev => ({ ...prev, productLink: link }));
+      setProductInputType('link'); // Set to link mode if link is provided
+    }
     if (price) setFormData(prev => ({ ...prev, unitPrice: parseFloat(price) || 0 }));
     if (quantity) setFormData(prev => ({ ...prev, quantity: parseInt(quantity) || 1 }));
+    
+    // Check for image from homepage
+    const storedImage = sessionStorage.getItem('orderProductImage');
+    if (storedImage && !link) {
+      setFormData(prev => ({ ...prev, productImage: storedImage }));
+      setImagePreview(storedImage);
+      setProductInputType('image');
+      sessionStorage.removeItem('orderProductImage'); // Clear after use
+    }
   }, [searchParams]);
+
+  // Update image preview when productImage changes
+  useEffect(() => {
+    if (formData.productImage) {
+      setImagePreview(formData.productImage);
+    }
+  }, [formData.productImage]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -99,14 +129,69 @@ const NewOrderPage: React.FC = () => {
     return formData.quantity * formData.unitPrice;
   };
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image size must be less than 10MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const uploadFormData = new FormData();
+      uploadFormData.append('image', file);
+
+      const response = await axios.post('/upload/image', uploadFormData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      const imageUrl = response.data.imageUrl || response.data.url;
+      setFormData(prev => ({ ...prev, productImage: imageUrl }));
+      setImagePreview(imageUrl);
+      toast.success('Image uploaded successfully');
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      toast.error(error.response?.data?.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData(prev => ({ ...prev, productImage: '' }));
+    setImagePreview('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
+      // Prepare order data based on selected input type
+      const orderData = { ...formData };
+      
       // If ordering from website product, don't include productLink
-      const orderData = isFromWebsite 
-        ? { ...formData, productLink: '' }
-        : formData;
+      if (isFromWebsite) {
+        orderData.productLink = '';
+      } else {
+        // Clear the unused field based on selected input type
+        if (productInputType === 'link') {
+          orderData.productImage = ''; // Clear image if using link
+        } else if (productInputType === 'image') {
+          orderData.productLink = ''; // Clear link if using image
+        }
+      }
       
       await createOrder(orderData);
       navigate('/orders');
@@ -171,20 +256,119 @@ const NewOrderPage: React.FC = () => {
 
                   {!isFromWebsite && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Product Link
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Show Product Using
                       </label>
-                      <div className="relative">
-                        <LinkIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input
-                          type="url"
-                          name="productLink"
-                          value={formData.productLink}
-                          onChange={handleInputChange}
-                          placeholder="https://example.com/product"
-                          className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
+                      
+                      {/* Toggle between Link and Image */}
+                      <div className="flex items-center space-x-4 mb-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductInputType('link');
+                            // Clear image when switching to link
+                            if (formData.productImage) {
+                              setFormData(prev => ({ ...prev, productImage: '' }));
+                              setImagePreview('');
+                            }
+                          }}
+                          className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                            productInputType === 'link'
+                              ? 'border-blue-600 bg-blue-50 text-blue-700'
+                              : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                          }`}
+                        >
+                          <LinkIcon className="w-5 h-5" />
+                          <span className="font-medium">Product Link</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductInputType('image');
+                            // Clear link when switching to image
+                            if (formData.productLink) {
+                              setFormData(prev => ({ ...prev, productLink: '' }));
+                            }
+                          }}
+                          className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                            productInputType === 'image'
+                              ? 'border-blue-600 bg-blue-50 text-blue-700'
+                              : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                          }`}
+                        >
+                          <ImageIcon className="w-5 h-5" />
+                          <span className="font-medium">Product Image</span>
+                        </button>
                       </div>
+
+                      {/* Show Link Input */}
+                      {productInputType === 'link' && (
+                        <div className="relative">
+                          <LinkIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <input
+                            type="url"
+                            name="productLink"
+                            value={formData.productLink}
+                            onChange={handleInputChange}
+                            placeholder="https://example.com/product"
+                            className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                      )}
+
+                      {/* Show Image Upload */}
+                      {productInputType === 'image' && (
+                        <div>
+                          {imagePreview || formData.productImage ? (
+                            <div className="relative">
+                              <img
+                                src={imagePreview || formData.productImage}
+                                alt="Product preview"
+                                className="w-full h-48 object-cover rounded-xl border border-gray-300"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleRemoveImage}
+                                className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-500 transition-colors">
+                              <input
+                                type="file"
+                                id="productImage"
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                                className="hidden"
+                                disabled={uploadingImage}
+                              />
+                              <label
+                                htmlFor="productImage"
+                                className="cursor-pointer flex flex-col items-center"
+                              >
+                                {uploadingImage ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                                    <span className="text-sm text-gray-600">Uploading...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                                    <span className="text-sm font-medium text-gray-700">
+                                      Click to upload product image
+                                    </span>
+                                    <span className="text-xs text-gray-500 mt-1">
+                                      PNG, JPG, WEBP up to 10MB
+                                    </span>
+                                  </>
+                                )}
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

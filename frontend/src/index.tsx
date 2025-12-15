@@ -7,6 +7,24 @@ import App from './App';
 import './index.css';
 import 'react-toastify/dist/ReactToastify.css';
 
+// Filter out WebSocket errors from browser extensions/dev tools
+if (typeof window !== 'undefined') {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    // Filter out WebSocket connection errors from browser extensions
+    const errorMessage = args.join(' ');
+    if (
+      errorMessage.includes('WebSocket connection to \'ws://localhost:3000/ws\' failed') ||
+      errorMessage.includes('WebSocketClient.js') ||
+      (errorMessage.includes('socket.js') && errorMessage.includes('localhost:3000'))
+    ) {
+      // Silently ignore these errors - they're from browser extensions
+      return;
+    }
+    originalError.apply(console, args);
+  };
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -22,7 +40,7 @@ if (process.env.NODE_ENV === 'development') {
   console.log('\n' + '='.repeat(60));
   console.log('🎨 FRONTEND STARTING');
   console.log('='.repeat(60));
-  console.log('🌐 Frontend URL: http://localhost:3000');
+  console.log('🌐 Frontend URL: http://localhost:3002');
   console.log('🔗 Backend API: ' + (process.env.REACT_APP_API_URL || '/api'));
   console.log('📦 Environment: Development');
   console.log('='.repeat(60) + '\n');

@@ -83,6 +83,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
       },
       cost: 0,
       freeShippingThreshold: 0,
+      shippingPriceIncluded: false,
+      taxIncluded: false,
     },
     featured: false,
     isActive: true, // Products are visible to all users by default
@@ -154,6 +156,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
           cost: currentProduct.shipping?.cost || 0,
           freeShippingThreshold:
             currentProduct.shipping?.freeShippingThreshold || 0,
+          shippingPriceIncluded: currentProduct.shipping?.shippingPriceIncluded || false,
+          taxIncluded: currentProduct.shipping?.taxIncluded || false,
         },
         featured: currentProduct.featured,
         isActive: currentProduct.isActive,
@@ -168,27 +172,34 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
     >
   ) => {
     const { name, value, type } = e.target;
+    const isCheckbox = type === "checkbox";
+    const checked = isCheckbox ? (e.target as HTMLInputElement).checked : undefined;
 
     if (name.includes(".")) {
-      const [parent, child, grandchild] = name.split(".");
+      const parts = name.split(".");
       setFormData((prev) => {
-        const parentObj = prev[parent as keyof typeof prev] as any;
+        const newData = { ...prev };
+        let current: any = newData;
 
-        return {
-          ...prev,
-          [parent]: {
-            ...parentObj,
-            [child]: grandchild
-              ? {
-                  ...parentObj[child],
-                  [grandchild]:
-                    type === "number" ? parseFloat(value) || 0 : value,
-                }
-              : type === "number"
-              ? parseFloat(value) || 0
-              : value,
-          },
-        };
+        // Navigate to the parent object
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (!current[parts[i]]) {
+            current[parts[i]] = {};
+          }
+          current = current[parts[i]];
+        }
+
+        // Set the final value
+        const lastKey = parts[parts.length - 1];
+        if (isCheckbox) {
+          current[lastKey] = checked;
+        } else if (type === "number") {
+          current[lastKey] = parseFloat(value) || 0;
+        } else {
+          current[lastKey] = value;
+        }
+
+        return newData;
       });
     } else {
       setFormData((prev) => ({
@@ -196,8 +207,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
         [name]:
           type === "number"
             ? parseFloat(value) || 0
-            : type === "checkbox"
-            ? (e.target as HTMLInputElement).checked
+            : isCheckbox
+            ? checked
             : value,
       }));
     }
@@ -1133,6 +1144,90 @@ const ProductForm: React.FC<ProductFormProps> = ({ mode }) => {
                       min="1"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* Shipping & Tax Information */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Shipping & Tax Information
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">
+                        Shipping Price Included
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Check if shipping cost is included in the product price
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      name="shipping.shippingPriceIncluded"
+                      checked={formData.shipping.shippingPriceIncluded}
+                      onChange={handleInputChange}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">
+                        Tax Included
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Check if tax is included in the product price
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      name="shipping.taxIncluded"
+                      checked={formData.shipping.taxIncluded}
+                      onChange={handleInputChange}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Shipping Days *
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">
+                          Minimum Days
+                        </label>
+                        <input
+                          type="number"
+                          name="shipping.estimatedDays.min"
+                          value={formData.shipping.estimatedDays.min}
+                          onChange={handleInputChange}
+                          min="0"
+                          placeholder="0"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">
+                          Maximum Days
+                        </label>
+                        <input
+                          type="number"
+                          name="shipping.estimatedDays.max"
+                          value={formData.shipping.estimatedDays.max}
+                          onChange={handleInputChange}
+                          min="0"
+                          placeholder="0"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Estimated delivery time in days (e.g., 7-14 days)
+                    </p>
                   </div>
                 </div>
               </div>

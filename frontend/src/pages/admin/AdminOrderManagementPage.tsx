@@ -13,7 +13,6 @@ import {
   AlertCircle,
   RefreshCw,
   TrendingUp,
-  BarChart3,
   PieChart,
   Activity,
   Users,
@@ -25,7 +24,6 @@ import {
 import { useOrderStore, getOrderId } from '../../store/orderStore';
 import { formatDistanceToNow } from 'date-fns';
 import OrderStatusChart from '../../components/admin/OrderStatusChart';
-import OrderTimelineChart from '../../components/admin/OrderTimelineChart';
 
 const AdminOrderManagementPage: React.FC = () => {
   const {
@@ -282,30 +280,6 @@ const AdminOrderManagementPage: React.FC = () => {
               </div>
             </div>
           </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Value</p>
-                <p className="text-2xl font-bold text-green-600">${(stats.totalValue || 0).toLocaleString()}</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-full">
-                <DollarSign className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Avg Order</p>
-                <p className="text-2xl font-bold text-indigo-600">${(stats.avgOrderValue || 0).toLocaleString()}</p>
-              </div>
-              <div className="p-3 bg-indigo-100 rounded-full">
-                <TrendingUp className="w-6 h-6 text-indigo-600" />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Charts Section */}
@@ -321,16 +295,6 @@ const AdminOrderManagementPage: React.FC = () => {
             <OrderStatusChart stats={stats} />
           </div>
 
-          {/* Order Timeline */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                <BarChart3 className="w-6 h-6 text-green-600 mr-3" />
-                Order Timeline (Last 7 Days)
-              </h2>
-            </div>
-            <OrderTimelineChart orders={orders} />
-          </div>
         </div>
 
         {/* Search and Filters */}

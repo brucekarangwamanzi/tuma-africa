@@ -1224,19 +1224,30 @@ router.post('/admin/create-with-user', authenticateToken, requireRole(['admin', 
     }
 
     // Check if chat already exists with this user
-    const existingChats = await Chat.findAll({
-      where: {
-        chatType: 'support',
-        ...(orderId && { orderId })
-      },
-      include: [{
-        model: User,
-        as: 'participants',
-        where: { id: userId },
-        attributes: ['id'],
-        through: { attributes: [] }
-      }]
-    });
+    // First, find chats that match the criteria
+    let existingChats = [];
+    try {
+      const allMatchingChats = await Chat.findAll({
+        where: {
+          chatType: 'support',
+          ...(orderId && { orderId })
+        },
+        include: [{
+          model: User,
+          as: 'participants',
+          attributes: ['id'],
+          through: { attributes: [] }
+        }]
+      });
+
+      // Filter to find chats that include the target user
+      existingChats = allMatchingChats.filter(chat => {
+        return chat.participants && chat.participants.some(p => p.id === userId);
+      });
+    } catch (queryError) {
+      console.error('Error querying existing chats:', queryError);
+      // Continue with empty array - will create new chat
+    }
 
     let chat;
     if (existingChats.length > 0) {
@@ -1258,6 +1269,43 @@ router.post('/admin/create-with-user', authenticateToken, requireRole(['admin', 
           }
         ]
       });
+
+      // Ensure admin is a participant
+      const adminIsParticipant = chat.participants && chat.participants.some(p => p.id === req.user.id);
+      if (!adminIsParticipant) {
+        try {
+          await chat.addParticipants([req.user.id]);
+          console.log(`✅ Added admin ${req.user.id} to existing chat ${chat.id}`);
+        } catch (addError) {
+          console.error('Error adding admin to existing chat:', addError);
+          // Try direct create
+          try {
+            const existing = await ChatParticipants.findOne({
+              where: { chatId: chat.id, userId: req.user.id }
+            });
+            if (!existing) {
+              await ChatParticipants.create({
+                chatId: chat.id,
+                userId: req.user.id
+              });
+              console.log(`✅ Added admin ${req.user.id} via direct create`);
+            }
+          } catch (createError) {
+            console.error('Error creating admin participant:', createError);
+          }
+        }
+        // Reload again to get updated participants
+        await chat.reload({
+          include: [
+            {
+              model: User,
+              as: 'participants',
+              attributes: ['id', 'fullName', 'email', 'role'],
+              through: { attributes: [] }
+            }
+          ]
+        });
+      }
     } else {
       // Create new chat
       const chatTitle = title || `Support Chat - ${targetUser.fullName}`;
@@ -1270,52 +1318,119 @@ router.post('/admin/create-with-user', authenticateToken, requireRole(['admin', 
         orderId: orderId || null
       });
 
-      // Add participants
-      await chat.addParticipants([userId, req.user.id]);
+      // Add participants with error handling
+      try {
+        await chat.addParticipants([userId, req.user.id]);
+        console.log(`✅ Added participants to chat ${chat.id}`);
+      } catch (participantError) {
+        console.error('Error adding participants via association:', participantError);
+        // Fallback: Add participants directly via ChatParticipants model
+        try {
+          // Check if participants already exist to avoid unique constraint errors
+          const existingParticipant1 = await ChatParticipants.findOne({
+            where: { chatId: chat.id, userId: userId }
+          });
+          const existingParticipant2 = await ChatParticipants.findOne({
+            where: { chatId: chat.id, userId: req.user.id }
+          });
+
+          if (!existingParticipant1) {
+            await ChatParticipants.create({
+              chatId: chat.id,
+              userId: userId
+            });
+            console.log(`✅ Added user ${userId} as participant via direct create`);
+          }
+
+          if (!existingParticipant2) {
+            await ChatParticipants.create({
+              chatId: chat.id,
+              userId: req.user.id
+            });
+            console.log(`✅ Added admin ${req.user.id} as participant via direct create`);
+          }
+        } catch (createError) {
+          console.error('Error creating participants directly:', createError);
+          // If it's a unique constraint error, that's okay - participants already exist
+          if (createError.name !== 'SequelizeUniqueConstraintError') {
+            throw new Error(`Failed to add participants: ${createError.message}`);
+          }
+        }
+      }
 
       // Reload with participants
-      await chat.reload({
-        include: [
-          {
-            model: User,
-            as: 'participants',
-            attributes: ['id', 'fullName', 'email', 'role'],
-            through: { attributes: [] }
-          },
-          {
-            model: Order,
-            as: 'order',
-            attributes: ['id', 'orderId', 'productName', 'status'],
-            required: false
-          }
-        ]
-      });
+      try {
+        await chat.reload({
+          include: [
+            {
+              model: User,
+              as: 'participants',
+              attributes: ['id', 'fullName', 'email', 'role'],
+              through: { attributes: [] }
+            },
+            {
+              model: Order,
+              as: 'order',
+              attributes: ['id', 'orderId', 'productName', 'status'],
+              required: false
+            }
+          ]
+        });
+      } catch (reloadError) {
+        console.error('Error reloading chat with associations:', reloadError);
+        // Try reloading without Order association
+        await chat.reload({
+          include: [
+            {
+              model: User,
+              as: 'participants',
+              attributes: ['id', 'fullName', 'email', 'role'],
+              through: { attributes: [] }
+            }
+          ]
+        });
+      }
 
       console.log(`✅ Created new chat ${chat.id} between admin ${req.user.id} and user ${userId}`);
     }
 
+    // Format response safely
+    const chatResponse = {
+      id: chat.id,
+      _id: chat.id, // For backward compatibility
+      title: chat.title,
+      chatType: chat.chatType,
+      status: chat.status,
+      priority: chat.priority,
+      participants: chat.participants || [],
+      orderId: chat.orderId || null,
+      order: chat.order || null,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt
+    };
+
     res.json({
       message: 'Chat retrieved successfully',
-      chat: {
-        id: chat.id,
-        _id: chat.id, // For backward compatibility
-        title: chat.title,
-        chatType: chat.chatType,
-        status: chat.status,
-        priority: chat.priority,
-        participants: chat.participants,
-        orderId: chat.orderId,
-        order: chat.order,
-        createdAt: chat.createdAt,
-        updatedAt: chat.updatedAt
-      }
+      chat: chatResponse
     });
 
   } catch (error) {
     console.error('Create chat with user error:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      userId: req.body.userId,
+      orderId: req.body.orderId,
+      adminId: req.user.id
+    });
     res.status(500).json({ 
       message: 'Failed to create chat',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        stack: error.stack
+      } : undefined
     });
   }
 });

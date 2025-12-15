@@ -407,8 +407,8 @@ router.put('/users/:userId/approve', authenticateToken, requireRole(['admin', 's
 
 // @route   PUT /api/admin/users/:userId/role
 // @desc    Update user role
-// @access  Private (Admin/Super Admin with restrictions)
-router.put('/users/:userId/role', authenticateToken, requireRole(['admin', 'super_admin']), sensitiveOperation, async (req, res) => {
+// @access  Private (Super Admin only - only super admins can change user roles)
+router.put('/users/:userId/role', authenticateToken, requireRole(['super_admin']), sensitiveOperation, async (req, res) => {
   try {
     const { userId } = req.params;
     const { role } = req.body;
@@ -426,16 +426,6 @@ router.put('/users/:userId/role', authenticateToken, requireRole(['admin', 'supe
     // Prevent changing own role
     if (user.id === req.user.id) {
       return res.status(400).json({ message: 'Cannot change your own role' });
-    }
-
-    // Only super_admin can create other super_admins
-    if (role === 'super_admin' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ message: 'Only super admins can create other super admins' });
-    }
-
-    // Only super_admin can modify other super_admins
-    if (user.role === 'super_admin' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ message: 'Only super admins can modify other super admins' });
     }
 
     await user.update({ role });

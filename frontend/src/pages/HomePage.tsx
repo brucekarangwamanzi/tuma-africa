@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Link2, ArrowRight, Image, UploadCloud, Send, Package, Inbox, UserCircle, Settings, PlusCircle, Check, ShoppingCart, Archive, Truck, Home, Menu, Briefcase, Globe, FileCheck, Car } from 'lucide-react';
+import { Link2, ArrowRight, Image as ImageIcon, UploadCloud, Send, Package, Inbox, UserCircle, Settings, PlusCircle, Check, ShoppingCart, Archive, Truck, Home, Menu, Briefcase, Globe, FileCheck, Car, Upload, X } from 'lucide-react';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 import AdvertisementBanner from '../components/ui/AdvertisementBanner';
 import FeaturedProducts from '../components/home/FeaturedProducts';
+import { useAuthStore } from '../store/authStore';
 
 // --- Global Styles Component ---
 // This component injects all the custom CSS from the original <style> tag.
@@ -69,24 +72,79 @@ const GlobalStyles = () => (
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { accessToken } = useAuthStore();
   const [productLink, setProductLink] = useState('');
+  const [productImage, setProductImage] = useState<string>('');
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [inputType, setInputType] = useState<'link' | 'image'>('link');
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image size must be less than 10MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await axios.post('/upload/image', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': accessToken ? `Bearer ${accessToken}` : undefined
+        }
+      });
+
+      const imageUrl = response.data.imageUrl || response.data.url;
+      setProductImage(imageUrl);
+      setImagePreview(imageUrl);
+      toast.success('Image uploaded successfully');
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      toast.error(error.response?.data?.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setProductImage('');
+    setImagePreview('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleStartOrder = (e?: React.FormEvent) => {
     e?.preventDefault();
     
-    if (!productLink.trim()) {
-      // If no link provided, just navigate to order page
-      navigate('/orders/new');
-      return;
-    }
-
-    // Navigate to order page with the product link
-    const params = new URLSearchParams({
-      link: productLink.trim()
-    });
+    const params = new URLSearchParams();
     
-    navigate(`/orders/new?${params.toString()}`);
+    if (inputType === 'link' && productLink.trim()) {
+      params.set('link', productLink.trim());
+      navigate(`/orders/new?${params.toString()}`);
+    } else if (inputType === 'image' && productImage) {
+      // Store image in sessionStorage to pass to order page
+      sessionStorage.setItem('orderProductImage', productImage);
+      navigate('/orders/new');
+    } else {
+      // No input provided, just navigate to order page
+      navigate('/orders/new');
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -97,8 +155,10 @@ const HomePage: React.FC = () => {
 
   // Focus input on mount for better UX
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (inputType === 'link') {
+      inputRef.current?.focus();
+    }
+  }, [inputType]);
 
   return (
     <>
@@ -113,32 +173,144 @@ const HomePage: React.FC = () => {
             From China, To Your Doorstep.
           </h1>
           <p className="mt-4 text-lg text-slate-600">
-            Simply paste a product link from any Chinese e-commerce site, and let us handle the rest. Shopping globally has never been this easy.
+            Simply paste a product link or upload a product image from any Chinese e-commerce site, and let us handle the rest. Shopping globally has never been this easy.
           </p>
         </div>
 
-        {/* --- Enhanced "Magic Link" Box with Functional Input --- */}
+        {/* --- Enhanced Order Input Box with Link/Image Toggle --- */}
         <div className="mt-12 max-w-2xl mx-auto">
+          {/* Input Type Toggle */}
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                setInputType('link');
+                setProductImage('');
+                setImagePreview('');
+                if (fileInputRef.current) fileInputRef.current.value = '';
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                inputType === 'link'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <Link2 size={18} />
+              <span>Product Link</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInputType('image');
+                setProductLink('');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                inputType === 'image'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-white text-slate-600 border border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <ImageIcon size={18} />
+              <span>Upload Image</span>
+            </button>
+          </div>
+
           <form onSubmit={handleStartOrder}>
-            <div className="bg-white p-4 rounded-xl shadow-lg border border-slate-200 flex flex-col sm:flex-row items-center gap-3 transition-all duration-300 focus-within:ring-2 focus-within:ring-orange-400 focus-within:shadow-xl">
-              <Link2 className="text-slate-400 h-6 w-6 hidden sm:block flex-shrink-0" />
-              <input 
-                ref={inputRef}
-                type="url" 
-                value={productLink}
-                onChange={(e) => setProductLink(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Paste your product link here..." 
-                className="w-full text-lg p-2 bg-transparent focus:outline-none flex-1" 
-              />
-              <button
-                type="submit"
-                className="btn-shine w-full sm:w-auto btn-primary font-semibold px-6 py-3 rounded-lg transition-transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 touch-manipulation"
-              >
-                <ArrowRight size={20} />
-                <span>Start Order</span>
-              </button>
-            </div>
+            {inputType === 'link' ? (
+              <div className="bg-white p-4 rounded-xl shadow-lg border border-slate-200 flex flex-col sm:flex-row items-center gap-3 transition-all duration-300 focus-within:ring-2 focus-within:ring-orange-400 focus-within:shadow-xl">
+                <Link2 className="text-slate-400 h-6 w-6 hidden sm:block flex-shrink-0" />
+                <input 
+                  ref={inputRef}
+                  type="url" 
+                  value={productLink}
+                  onChange={(e) => setProductLink(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Paste your product link here..." 
+                  className="w-full text-lg p-2 bg-transparent focus:outline-none flex-1" 
+                />
+                <button
+                  type="submit"
+                  className="btn-shine w-full sm:w-auto btn-primary font-semibold px-6 py-3 rounded-lg transition-transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 touch-manipulation"
+                >
+                  <ArrowRight size={20} />
+                  <span>Start Order</span>
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200 transition-all duration-300">
+                {imagePreview ? (
+                  <div className="space-y-4">
+                    <div className="relative group">
+                      <img
+                        src={imagePreview}
+                        alt="Product preview"
+                        className="w-full h-64 object-cover rounded-lg border-2 border-slate-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                    <button
+                      type="submit"
+                      className="btn-shine w-full btn-primary font-semibold px-6 py-3 rounded-lg transition-transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <ArrowRight size={20} />
+                      <span>Start Order</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-300 rounded-xl p-12 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-200 group"
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                      {uploadingImage ? (
+                        <div className="flex flex-col items-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                          <span className="text-slate-600 font-medium">Uploading image...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <div className="bg-blue-100 p-4 rounded-full mb-4 group-hover:bg-blue-200 transition-colors">
+                            <UploadCloud size={32} className="text-blue-600" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                            Upload Product Image
+                          </h3>
+                          <p className="text-sm text-slate-600 mb-1">
+                            Click to browse or drag and drop
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            PNG, JPG, WEBP up to 10MB
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingImage}
+                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <Upload size={18} />
+                      <span>Choose Image</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </form>
         </div>
 

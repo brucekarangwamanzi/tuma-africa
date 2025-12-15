@@ -65,6 +65,7 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
     const {
       productName,
       productLink,
+      productImage,
       quantity,
       unitPrice,
       shippingCost = 0,
@@ -79,6 +80,7 @@ router.post('/', authenticateToken, requireApproval, validateOrderCreation, asyn
       userId: req.user.id,
       productName,
       productLink: productLink || '',
+      productImage: productImage || '',
       quantity,
       unitPrice,
       totalPrice: totalPrice || (quantity * unitPrice),

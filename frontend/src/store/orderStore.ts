@@ -54,6 +54,7 @@ export const getOrderId = (order: Order): string => {
 interface OrderFormData {
   productName: string;
   productLink: string;
+  productImage?: string;
   quantity: number;
   unitPrice: number;
   freightType: 'sea' | 'air';
@@ -189,6 +190,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const payload = {
         productName: orderData.productName,
         productLink: orderData.productLink || '', // Empty string if not provided
+        productImage: orderData.productImage || '', // Product image URL
         quantity: orderData.quantity,
         unitPrice: orderData.unitPrice,
         freightType: orderData.freightType || 'sea',

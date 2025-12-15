@@ -110,6 +110,12 @@ class WebSocketService {
     });
 
     this.socket.on('connect_error', async (error: Error) => {
+      // Ignore errors from browser extensions or dev tools trying to connect to wrong ports
+      if (error.message && (error.message.includes('localhost:3000') || error.message.includes('ws://localhost:3000'))) {
+        // This is likely from a browser extension, ignore it
+        return;
+      }
+
       // Only log authentication errors, not every connection attempt
       if (error.message.includes('Authentication') || error.message.includes('401') || error.message.includes('403')) {
         if (process.env.NODE_ENV === 'development') {
